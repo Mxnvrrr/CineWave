@@ -152,13 +152,13 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   <!-- Loading skeletons (replaced when the page is ready) -->
   <div class="sc"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
 </main>
-<footer>CineWave is an original demo project. Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash. Replace the demo data in the script.</footer>
+<footer>CineWave is an original demo project. Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash.</footer>
 
 <div class="mo" id="modal" hidden role="dialog" aria-modal="true" aria-label="Title details"></div>
 <div class="pl" id="player" hidden>
   <div class="pw">
     <video id="v" playsinline></video>
-    <div id="perr" hidden><h2>😕 Video unavailable</h2><p>This demo video could not be loaded. Check your internet connection or replace the video link.</p></div>
+    <div id="perr" hidden><h2>😕 Video unavailable</h2><p>This demo video could not be loaded. Please check your internet connection and try again.</p></div>
     <div id="ptitle"></div><button id="pclose" aria-label="Close player">×</button>
     <div class="ctl">
       <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Progress">
@@ -175,7 +175,7 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
 <script>
 // ---------- 3. JAVASCRIPT ----------
 
-// =====================  DATA  (EDIT THIS PART!)  =====================
+// =====================  DATA: the demo titles live here  =====================
 // One line = one title. Order of the fields:
 // [id, type ('movie' or 'show'), title, year, genre, language, rating, duration,
 //  colour1, colour2 (poster colours), cast, description]
@@ -209,18 +209,20 @@ const RAW = [
 [27,'show','K-Campus',2026,'Drama','Korean',8.3,'2 Seasons','#f783ac','#3b5bdb','Soo-ah Kim, Do-hyun Park','Students at an elite academy learn the price of the top rank.'],
 [28,'show','Sakura Squad',2025,'Animation','Japanese',8.6,'3 Seasons','#faa2c1','#1971c2','Voices: Yui Sato, Kaito Endo','Five school kids guard the city from playful spirits.'],
 [29,'show','Wild Frontiers',2024,'Documentary','English',8.4,'2 Seasons','#66a80f','#1b2a1b','Narrated by Owen Marsh','Life on the last untouched borders of our planet.'],
-[30,'show','Kolkata Files',2026,'Thriller','Bengali',8.2,'2 Seasons','#fd7e14','#1a1a2e','Ishaan Dutta, Rupa Sen','A retired journalist reopens a case the city forgot.']
+[30,'show','Kolkata Files',2026,'Thriller','Bengali',8.2,'2 Seasons','#fd7e14','#1a1a2e','Ishaan Dutta, Rupa Sen','A retired journalist reopens a case the city forgot.'],
+[31,'movie','Monsoon Express',2026,'Action','Hindi',8.5,'2h 5m','#e8590c','#1a1a40','Aarav Sharma, Kiara Bose','A rescue train races a flood across the country.']
 ];
-// Demo videos (Blender Foundation open movies). Replace with your own MP4 links!
+// Demo videos (Blender Foundation open movies). Any direct .mp4 link works here.
 const VIDEOS = [
  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
 ];
-// Turns each line above into an object. To use a real poster image, set poster:'https://...' below.
+// Turns each row above into an object the rest of the code can use, and adds the poster, backdrop and video address.
 const items = RAW.map(r => ({id:r[0],type:r[1],title:r[2],year:r[3],genre:r[4],language:r[5],rating:r[6],
-  duration:r[7],c1:r[8],c2:r[9],cast:r[10],description:r[11],// Photos come from picsum.photos (free Unsplash photos). To use your own, replace these two lines with your own image links.
+  duration:r[7],c1:r[8],c2:r[9],cast:r[10],description:r[11],
+  // placeholder photos from picsum.photos (Unsplash); the number in the address gives each title its own picture
   poster:'https://picsum.photos/seed/cinewave'+r[0]+'/400/600',
   backdrop:'https://picsum.photos/seed/cinewave'+r[0]+'/1600/900',
   video:VIDEOS[r[0]%4]}));
@@ -243,6 +245,7 @@ function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');cl
 const g = n => a => a.filter(m => m.genre === n);
 const ROWS = [
  ['Trending Now', a => [...a].sort((x,y)=>y.rating-x.rating).slice(0,12)],
+ ['Top Rated 8.5+', a => a.filter(m=>m.rating>=8.5).sort((x,y)=>y.rating-x.rating)],
  ['Popular Movies', a => a.filter(m=>m.type==='movie').slice(0,12)],
  ['Popular TV Shows', a => a.filter(m=>m.type==='show')],
  ['New Releases', a => a.filter(m=>m.year>=2026)],

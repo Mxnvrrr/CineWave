@@ -4,8 +4,7 @@ A Netflix-style streaming website UI built with **only HTML, CSS and vanilla Jav
 
 > Learning / portfolio project. CineWave is an original brand and is not affiliated with any streaming service. All titles are fictional demo data.
 
-**Live demo:** https://YOUR-USERNAME.github.io/cinewave/
-
+**Live demo:** (https://mxnvrrr.github.io/CineWave/)
 ## Features
 
 - Cinematic hero banner that changes automatically

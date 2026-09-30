@@ -4,7 +4,8 @@ A Netflix-style streaming website UI built with **only HTML, CSS and vanilla Jav
 
 > Learning / portfolio project. CineWave is an original brand and is not affiliated with any streaming service. All titles are fictional demo data.
 
-**Live demo:** (https://mxnvrrr.github.io/CineWave/)
+**Live demo:** https://YOUR-USERNAME.github.io/cinewave/
+
 ## Features
 
 - Cinematic hero banner that changes automatically
@@ -21,13 +22,28 @@ Download `index.html` and double-click it. It opens in Chrome. Nothing to instal
 
 ## Change the content
 
-Open `index.html` in a text editor and find the section marked `EDIT THIS PART!`. Each line is one title:
+Open `index.html` in a text editor and look at the data section at the top of the script (the `RAW` list). Each line is one title:
 
 ```
 [id, type, title, year, genre, language, rating, duration, colour1, colour2, cast, description]
 ```
 
-Video links are in the `VIDEOS` list. Poster and backdrop image links are set in the `items` list just below it.
+Video links are in the `VIDEOS` list. Poster and backdrop image links are set in the `items` list just below it. The rows on the home page are defined in the `ROWS` list further down.
+
+## How it works
+
+1. All titles live in one list, `RAW`, in `index.html`. A `map` turns every row into an object and adds a poster, backdrop and video address.
+2. The current choices are kept in two small objects: `state` (which page is open and what was searched) and `F` (the genre, language, year and rating filters).
+3. `render()` starts from all titles, keeps the ones that pass the filters, then applies the current page or search text.
+4. On the home page each entry in `ROWS` picks its titles from that filtered list. Empty rows are skipped and the rest are turned into HTML by `card()`.
+5. The HTML is written into the page in one go. One click listener handles play buttons, My List buttons and card clicks, and My List, Continue Watching and the theme are saved in `localStorage`.
+
+## AI use
+
+I used Claude (an AI assistant made by Anthropic) on this project.
+
+- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, and to explain how parts of the code work.
+- **What I changed myself:** [fill in after your commits, for example: I added the title "..." to the data and added the "Top Rated 8.5+" row, each as its own commit.]
 
 ## Tech
 

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CineWave – Stream Stories</title>
+<!-- =====================================================================
+  CineWave: a demo streaming site. One file, no installation.
+  Sections: 1) CSS  2) HTML  3) JavaScript (DATA is at the top of the script)
+===================================================================== -->
+<style>
+/* ---------- 1. CSS: colours live in variables so dark/light mode is easy ---------- */
+:root{--bg:#0b0b12;--fg:#fff;--mut:#a9a9bd;--card:#1a1a28;--acc:#ff3d4a;--acc2:#8a3ffc;--nav:rgba(11,11,18,.6)}
+[data-theme=light]{--bg:#f4f4f8;--fg:#14141c;--mut:#55556a;--card:#fff;--nav:rgba(244,244,248,.7)}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font:16px/1.5 system-ui,"Segoe UI",sans-serif;overflow-x:hidden;transition:background .3s,color .3s}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--acc2);outline-offset:2px}
+[hidden]{display:none!important}
+/* Navbar: transparent at top, darker + blurred after scrolling */
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:20px;padding:14px 4%;background:linear-gradient(#000a,transparent);transition:background .4s,backdrop-filter .4s}
+.nav.scrolled{background:var(--nav);backdrop-filter:blur(14px);box-shadow:0 4px 24px #0006}
+.logo{display:flex;align-items:center;gap:8px;font-weight:900;font-size:1.4rem;letter-spacing:-.5px;background:none;color:#fff}
+.logo b{background:linear-gradient(90deg,var(--acc),#ff9a3d,var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.links{display:flex;gap:4px;flex:1}
+.links button,.rt>button{padding:6px 12px;border-radius:20px;color:#fff;opacity:.8;transition:.2s}
+.links button:hover,.links button.on{opacity:1;background:#ffffff26}
+[data-theme=light] .nav.scrolled .links button,[data-theme=light] .nav.scrolled .rt>button{color:var(--fg)}
+.rt{display:flex;align-items:center;gap:6px;position:relative}
+#sbox{display:flex;align-items:center;position:relative}
+#q{width:0;padding:0;border:0;background:#000b;border-radius:20px;color:#fff;transition:width .35s,padding .35s}
+#sbox.open #q{width:min(240px,45vw);padding:7px 34px 7px 14px;border:1px solid #fff5}
+#clr{position:absolute;right:6px;color:#fff}
+#sug{position:absolute;top:110%;right:0;width:260px;background:var(--card);border-radius:10px;box-shadow:0 10px 30px #0008;overflow:hidden}
+#sug button{display:block;width:100%;text-align:left;padding:9px 14px}
+#sug button:hover{background:var(--acc2);color:#fff}
+#pm{position:absolute;top:120%;right:0;background:var(--card);border-radius:12px;padding:6px;min-width:190px;box-shadow:0 10px 30px #0008}
+#pm button{display:block;width:100%;text-align:left;padding:10px 14px;border-radius:8px}
+#pm button:hover{background:var(--acc2);color:#fff}
+.avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:grid;place-items:center;font-weight:800;color:#fff}
+#burger{display:none}
+/* Hero banner */
+#hero{position:relative;height:84vh;min-height:500px;overflow:hidden}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:12px;padding:0 4% 12vh;transition:opacity .4s,transform .4s;background:linear-gradient(120deg,var(--a),var(--b))}
+.slide::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 75% 30%,#ffffff30,transparent 45%)}
+.slide::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,var(--bg) 2%,transparent 60%),linear-gradient(90deg,#000c,transparent 65%)}
+.slide>*{position:relative;z-index:2;max-width:640px;color:#fff}
+.slide.out{opacity:0;transform:translateX(-30px)}
+.slide .bg,.bd .bdimg{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;z-index:0}
+.slide h1{font-size:clamp(2.2rem,7vw,4.5rem);line-height:1.05;font-weight:900;text-shadow:0 4px 20px #0008}
+.meta{display:flex;flex-wrap:wrap;gap:10px;font-weight:600;font-size:.95rem}
+.meta span{padding:1px 8px;border:1px solid #fff6;border-radius:4px}
+.meta .rt2{color:#ffd166;border-color:#ffd166}
+.btns{display:flex;gap:12px;flex-wrap:wrap}
+.b{padding:11px 26px;border-radius:8px;font-weight:700;transition:transform .2s,box-shadow .2s}
+.b:hover{transform:translateY(-2px) scale(1.04)}
+.b.p{background:linear-gradient(90deg,var(--acc),#ff7a3d);color:#fff;box-shadow:0 6px 20px #ff3d4a66}
+.b.s{background:#ffffff33;color:#fff;backdrop-filter:blur(6px)}
+.dots{position:absolute;right:4%;bottom:10vh;z-index:5;display:flex;gap:8px}
+.dots button{width:10px;height:10px;border-radius:50%;background:#fff6}
+.dots button.on{background:var(--acc);width:26px;border-radius:6px}
+/* Filters */
+.filters{display:flex;gap:10px;flex-wrap:wrap;padding:8px 4% 0}
+body.nohero .filters{padding-top:92px}
+.filters select{background:var(--card);border:1px solid #8886;border-radius:8px;padding:7px 10px}
+/* Rows + cards */
+.row h2,.grid-h{padding:14px 4% 0;font-size:1.3rem}
+.sc{display:flex;gap:14px;overflow-x:auto;padding:22px 4% 34px;scroll-snap-type:x proximity;scrollbar-width:thin}
+.card{flex:none;width:clamp(135px,16vw,205px);scroll-snap-align:start;cursor:pointer;transition:transform .3s,box-shadow .3s;border-radius:12px;position:relative}
+.card:hover,.card:focus-within{transform:scale(1.09);z-index:5;box-shadow:0 12px 34px #ff3d4a55,0 0 0 1px #fff3}
+.poster{position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:linear-gradient(160deg,var(--a),var(--b));display:flex;align-items:flex-end;box-shadow:0 4px 14px #0006}
+.poster img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.poster::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#000c,transparent 55%)}
+.poster b{position:relative;z-index:1;padding:12px;font-size:1.05rem;line-height:1.15;color:#fff;text-shadow:0 2px 8px #000}
+.ov{position:absolute;z-index:2;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:10px;background:linear-gradient(0deg,#000e,#0004);opacity:0;transition:opacity .25s;color:#fff;font-size:.78rem}
+.card:hover .ov,.card:focus-within .ov{opacity:1}
+.ov .bt{display:flex;gap:8px}
+.ov button{width:34px;height:34px;border-radius:50%;background:#fff;color:#000;font-weight:900;transition:transform .2s}
+.ov button:first-child{background:var(--acc);color:#fff}
+.ov button:hover{transform:scale(1.15)}
+.cap{padding:8px 2px 0}.cap div{font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cap small{color:var(--mut);font-size:.75rem}
+.pb{position:absolute;z-index:2;left:0;right:0;bottom:0;height:5px;background:#fff4}.pb u{display:block;height:100%;background:var(--acc)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:22px 14px;padding:20px 4% 40px}
+.grid .card{width:auto}
+.empty,.em{text-align:center;color:var(--mut);padding:40px 4%}
+.empty div{font-size:3rem}.em{padding:14px 4% 24px;text-align:left}
+/* Loading skeleton */
+.sk{flex:none;width:clamp(135px,16vw,205px);aspect-ratio:2/3;border-radius:12px;background:linear-gradient(90deg,var(--card) 25%,#8884 50%,var(--card) 75%);background-size:200%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+/* Modal */
+.mo{position:fixed;inset:0;z-index:100;background:#000b;display:grid;place-items:center;animation:fi .25s}
+.md{width:min(820px,94vw);max-height:92vh;overflow:auto;background:var(--card);border-radius:16px;animation:pop .35s;position:relative}
+.bd{height:260px;position:relative;display:flex;align-items:flex-end;gap:18px;padding:18px;background:linear-gradient(120deg,var(--a),var(--b))}
+.bd::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,var(--card),transparent 70%)}
+.bd>*{position:relative;z-index:2}.bd .poster{width:120px;flex:none}
+.bd h2{font-size:clamp(1.5rem,5vw,2.4rem);line-height:1.1;color:#fff}
+.inf{padding:6px 24px 26px;display:grid;gap:10px}.inf p{color:var(--mut)}
+.x{position:absolute;top:10px;right:12px;z-index:5;width:36px;height:36px;border-radius:50%;background:#000a;color:#fff;font-size:1.4rem}
+@keyframes fi{from{opacity:0}}@keyframes pop{from{opacity:0;transform:scale(.9) translateY(20px)}}
+/* Video player */
+.pl{position:fixed;inset:0;z-index:200;background:#000;color:#fff}
+.pw{position:relative;width:100%;height:100%;background:#000}
+#v{width:100%;height:100%;object-fit:contain}
+#perr{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:8px;padding:20px}
+.ctl{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:30px 3% 14px;background:linear-gradient(0deg,#000d,transparent)}
+.ctl button,.ctl select{padding:6px 10px;border-radius:8px;background:#ffffff26;color:#fff}
+.ctl select option{color:#000}
+#seek{flex:1 1 100%;accent-color:var(--acc)}#vol{width:80px;accent-color:var(--acc)}
+#ptitle{position:absolute;top:14px;left:4%;font-weight:800;font-size:1.2rem}
+#pclose{position:absolute;top:8px;right:14px;font-size:2rem;color:#fff}
+#toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,80px);background:var(--acc2);color:#fff;padding:10px 20px;border-radius:24px;z-index:300;transition:transform .3s}
+#toast.show{transform:translate(-50%,0)}
+footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
+/* Mobile */
+@media(max-width:800px){
+ #burger{display:block;color:#fff;font-size:1.5rem}
+ .links{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;background:var(--nav);backdrop-filter:blur(14px);padding:10px 4%}
+ .links.open{display:flex}.links button{text-align:left;color:var(--fg)}
+ .nav{gap:10px}.rt{margin-left:auto}.logo{font-size:1.15rem}
+ #hero{height:70vh}.bd{height:220px}.bd .poster{width:90px}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body class="nohero">
+<!-- ---------- 2. HTML ---------- -->
+<nav class="nav" id="nav" aria-label="Main">
+  <button id="burger" aria-label="Open menu">☰</button>
+  <button class="logo" data-view="home" aria-label="CineWave home">
+    <svg width="30" height="24" viewBox="0 0 30 24" aria-hidden="true"><defs><linearGradient id="g"><stop offset="0" stop-color="#ff3d4a"/><stop offset="1" stop-color="#8a3ffc"/></linearGradient></defs><path d="M2 12q4-10 7 0t7 0 7 0 5 0" stroke="url(#g)" stroke-width="4" fill="none" stroke-linecap="round"/></svg>Cine<b>Wave</b>
+  </button>
+  <div class="links" id="links">
+    <button data-view="home" class="on">Home</button><button data-view="movies">Movies</button><button data-view="tv">TV Shows</button><button data-view="new">New &amp; Popular</button><button data-view="mylist">My List</button>
+  </div>
+  <div class="rt">
+    <div id="sbox"><input id="q" type="search" placeholder="Title, actor, genre…" aria-label="Search" autocomplete="off"><button id="clr" hidden aria-label="Clear search">×</button><button id="sbtn" aria-label="Search">🔍</button><div id="sug" hidden></div></div>
+    <button id="theme" aria-label="Toggle dark/light mode">🌓</button>
+    <button id="prof" aria-label="Profile menu" aria-haspopup="true"><span class="avatar">M</span></button>
+    <div id="pm" hidden>
+      <button data-act="profile">👤 Profile</button><button data-view="mylist">📌 My List</button><button data-view="continue">⏯ Continue Watching</button><button data-act="settings">⚙ Settings</button>
+    </div>
+  </div>
+</nav>
+<header id="hero" aria-label="Featured titles" hidden></header>
+<div class="filters" id="filters">
+  <select id="fg" aria-label="Genre"></select><select id="fl" aria-label="Language"></select><select id="fy" aria-label="Year"></select><select id="fr" aria-label="Rating"></select>
+</div>
+<main id="main" aria-live="polite">
+  <!-- Loading skeletons (replaced when the page is ready) -->
+  <div class="sc"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+</main>
+<footer>CineWave is an original demo project. Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash. Replace the demo data in the script.</footer>
+
+<div class="mo" id="modal" hidden role="dialog" aria-modal="true" aria-label="Title details"></div>
+<div class="pl" id="player" hidden>
+  <div class="pw">
+    <video id="v" playsinline></video>
+    <div id="perr" hidden><h2>😕 Video unavailable</h2><p>This demo video could not be loaded. Check your internet connection or replace the video link.</p></div>
+    <div id="ptitle"></div><button id="pclose" aria-label="Close player">×</button>
+    <div class="ctl">
+      <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Progress">
+      <button id="pp" aria-label="Play or pause">▶</button><button id="back" aria-label="Back 10 seconds">⏪ 10</button><button id="fwd" aria-label="Forward 10 seconds">10 ⏩</button>
+      <button id="mute" aria-label="Mute">🔊</button><input id="vol" type="range" min="0" max="1" step=".05" value="1" aria-label="Volume">
+      <span id="tm">0:00</span>
+      <select id="spd" aria-label="Playback speed"><option>0.5</option><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select>
+      <button id="pip" aria-label="Picture in picture">⧉</button><button id="fs" aria-label="Fullscreen">⛶</button>
+    </div>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+// ---------- 3. JAVASCRIPT ----------
+
+// =====================  DATA  (EDIT THIS PART!)  =====================
+// One line = one title. Order of the fields:
+// [id, type ('movie' or 'show'), title, year, genre, language, rating, duration,
+//  colour1, colour2 (poster colours), cast, description]
+const RAW = [
+[1,'movie','Neon Horizon',2026,'Sci-Fi','English',8.6,'2h 8m','#ff3d4a','#2a0a4a','Ava Lin, Marcus Cole','A pilot races a collapsing city grid to reach the last open sky.'],
+[2,'movie','The Last Monsoon',2026,'Drama','Hindi',8.4,'2h 21m','#0f5c7a','#1b1147','Riya Mehta, Arjun Kapoor','A family gathers one final time before the old house is sold.'],
+[3,'movie','Kabaddi Kings',2025,'Action','Punjabi',7.9,'2h 4m','#e8590c','#5c0a1e','Gurjot Sandhu, Simran Gill','A village team fights its way to the national championship.'],
+[4,'movie','Madras Midnight',2025,'Thriller','Tamil',8.1,'2h 12m','#1a1a40','#c2255c','Karthik Raja, Meena Devi','One night, one taxi, and a passenger who knows too much.'],
+[5,'movie','Hyderabad Heist',2026,'Thriller','Telugu',7.8,'2h 30m','#b8860b','#3b0764','Ravi Teja Varma, Nisha Reddy','Five strangers plan the perfect job at a royal auction.'],
+[6,'movie','Backwater Tales',2024,'Drama','Malayalam',8.7,'1h 58m','#087f5b','#0b2545','Anoop Nair, Lakshmi Menon','A boatman and a letter travel the length of Kerala.'],
+[7,'movie','Kaveri Skies',2025,'Drama','Kannada',8.0,'2h 6m','#1971c2','#862e9c','Vikram Gowda, Sindhu Rao','Two sisters reunite to save the family coffee estate.'],
+[8,'movie','Dhaka Lanterns',2024,'Drama','Bengali',8.3,'2h 10m','#d9480f','#212529','Tanvir Rahman, Mitali Sen','A festival night changes three lives forever.'],
+[9,'movie','Pune Diaries',2026,'Comedy','Marathi',7.6,'1h 49m','#f59f00','#a61e4d','Omkar Patil, Sneha Joshi','Roommates, a broken lift and one very chaotic wedding.'],
+[10,'movie','Rann Ki Raat',2025,'Thriller','Gujarati',7.7,'2h 1m','#5f3dc4','#000000','Hetal Shah, Mihir Desai','Lost in the salt desert, a film crew finds it is not alone.'],
+[11,'movie','La Casa Vacía',2025,'Thriller','Spanish',8.0,'1h 55m','#a61e4d','#1e1e2f','Lucía Ortega, Mateo Ruiz','A woman inherits a house that no one will enter.'],
+[12,'movie','Lumière d\'Été',2024,'Drama','French',8.2,'1h 47m','#fab005','#1864ab','Camille Laurent, Hugo Petit','One summer on the coast, two artists, one unfinished painting.'],
+[13,'movie','Seoul Frequency',2026,'Sci-Fi','Korean',8.8,'2h 14m','#7048e8','#0b7285','Ji-woo Han, Min-jun Seo','A radio host receives calls from tomorrow.'],
+[14,'movie','Tokyo Paper Moon',2025,'Animation','Japanese',8.9,'1h 52m','#e64980','#364fc7','Voices: Aoi Mori, Ren Takeda','A paper lantern spirit guides a lost girl across the city.'],
+[15,'movie','Star Harvest',2026,'Sci-Fi','English',8.5,'2h 25m','#f76707','#12006b','Nora Quinn, Elias Stone','Farmers on a dying planet discover a signal in the wheat.'],
+[16,'movie','Laugh Track',2025,'Comedy','English',7.4,'1h 41m','#fcc419','#c92a2a','Danny Cruz, Priya Nair','A failing sitcom writer gets one week to save the show.'],
+[17,'movie','Iron Tide',2024,'Action','English',7.8,'2h 3m','#495057','#c92a2a','Jack Harlan, Zoe Winters','A coast guard crew faces the storm of the century.'],
+[18,'movie','The Quiet Reef',2025,'Documentary','English',8.6,'1h 36m','#0c8599','#1c3d5a','Narrated by Helen Ashby','A year inside one of the last healthy coral reefs.'],
+[19,'movie','Dilli Dreams',2026,'Comedy','Hindi',7.5,'2h 0m','#f03e3e','#5f3dc4','Kabir Anand, Tara Bedi','A small-town chef takes on the biggest kitchens in Delhi.'],
+[20,'movie','Paper Lanterns',2024,'Animation','English',8.1,'1h 33m','#ffa94d','#5f3dc4','Voices: Lily Park, Sam Ito','Three lantern-makers race to light the city festival.'],
+[21,'show','Signal Lost',2026,'Sci-Fi','English',8.7,'3 Seasons','#22b8cf','#1a0b3b','Mia Rowan, Theo Vance','A research station stops answering. Something answers instead.'],
+[22,'show','Mumbai Mirage',2025,'Thriller','Hindi',8.5,'2 Seasons','#e03131','#101033','Aditya Rao, Neha Bhatia','A detective chases a con artist who is always one step ahead.'],
+[23,'show','Punjab Junction',2026,'Comedy','Punjabi',7.9,'4 Seasons','#ffd43b','#c2255c','Harleen Kaur, Jassi Brar','Life at a busy railway dhaba, told one chai at a time.'],
+[24,'show','Coastal Kings',2024,'Drama','Malayalam',8.2,'2 Seasons','#0ca678','#1c1c3c','Sreejith Pillai, Anu Thomas','Rival fishing families fight over the same sea.'],
+[25,'show','Casa Aurora',2025,'Drama','Spanish',8.1,'3 Seasons','#ff8787','#3b0764','Elena Vargas, Diego Salas','Three generations run a hotel with a hidden past.'],
+[26,'show','Nuit Blanche',2025,'Thriller','French',8.0,'2 Seasons','#4263eb','#0b0b12','Léa Moreau, Paul Girard','A sleepless city, a missing pianist, a mystery to solve.'],
+[27,'show','K-Campus',2026,'Drama','Korean',8.3,'2 Seasons','#f783ac','#3b5bdb','Soo-ah Kim, Do-hyun Park','Students at an elite academy learn the price of the top rank.'],
+[28,'show','Sakura Squad',2025,'Animation','Japanese',8.6,'3 Seasons','#faa2c1','#1971c2','Voices: Yui Sato, Kaito Endo','Five school kids guard the city from playful spirits.'],
+[29,'show','Wild Frontiers',2024,'Documentary','English',8.4,'2 Seasons','#66a80f','#1b2a1b','Narrated by Owen Marsh','Life on the last untouched borders of our planet.'],
+[30,'show','Kolkata Files',2026,'Thriller','Bengali',8.2,'2 Seasons','#fd7e14','#1a1a2e','Ishaan Dutta, Rupa Sen','A retired journalist reopens a case the city forgot.']
+];
+// Demo videos (Blender Foundation open movies). Replace with your own MP4 links!
+const VIDEOS = [
+ 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+ 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+ 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+ 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+];
+// Turns each line above into an object. To use a real poster image, set poster:'https://...' below.
+const items = RAW.map(r => ({id:r[0],type:r[1],title:r[2],year:r[3],genre:r[4],language:r[5],rating:r[6],
+  duration:r[7],c1:r[8],c2:r[9],cast:r[10],description:r[11],// Photos come from picsum.photos (free Unsplash photos). To use your own, replace these two lines with your own image links.
+  poster:'https://picsum.photos/seed/cinewave'+r[0]+'/400/600',
+  backdrop:'https://picsum.photos/seed/cinewave'+r[0]+'/1600/900',
+  video:VIDEOS[r[0]%4]}));
+const FEATURED = [15,13,2,21,1];          // ids shown in the hero banner
+const INDIAN = ['Hindi','Punjabi','Tamil','Telugu','Malayalam','Kannada','Bengali','Marathi','Gujarati'];
+
+// =====================  HELPERS  =====================
+const $ = s => document.querySelector(s);
+const byId = id => items.find(m => m.id == id);
+const esc = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+const ls = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d } catch (e) { return d } };
+const sv = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) {} };
+let list = ls('cw_list', []);            // My List: array of ids
+let cw = ls('cw_watch', {});             // Continue Watching: {id:{t,d,ts}}
+let state = {view:'home', q:''}, F = {genre:'', language:'', year:'', rating:''};
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2200)}
+
+// =====================  ROWS  =====================
+// [row title, function that picks titles]. Add or remove rows here.
+const g = n => a => a.filter(m => m.genre === n);
+const ROWS = [
+ ['Trending Now', a => [...a].sort((x,y)=>y.rating-x.rating).slice(0,12)],
+ ['Popular Movies', a => a.filter(m=>m.type==='movie').slice(0,12)],
+ ['Popular TV Shows', a => a.filter(m=>m.type==='show')],
+ ['New Releases', a => a.filter(m=>m.year>=2026)],
+ ['Continue Watching', a => a.filter(m=>cw[m.id])],
+ ['My List', a => a.filter(m=>list.includes(m.id))],
+ ['Recommended For You', a => a.filter(m=>m.id%2)],
+ ['Action',g('Action')],['Comedy',g('Comedy')],['Drama',g('Drama')],['Thriller',g('Thriller')],
+ ['Sci-Fi',g('Sci-Fi')],['Animation',g('Animation')],['Documentaries',g('Documentary')],
+ ['Indian Cinema', a => a.filter(m=>INDIAN.includes(m.language))],
+ ['International', a => a.filter(m=>!INDIAN.includes(m.language))]
+];
+const EMPTY = {'Continue Watching':'Nothing here yet. Press Play on any title and it will appear.','My List':'Your list is empty. Tap + on any title to save it.'};
+
+// =====================  CARDS  =====================
+const card = m => {
+  const p = cw[m.id], inList = list.includes(m.id);
+  return `<article class="card" tabindex="0" data-id="${m.id}" aria-label="${esc(m.title)}">
+  <div class="poster" style="--a:${m.c1};--b:${m.c2}">
+    ${m.poster ? `<img loading="lazy" src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">` : ''}
+    <b>${esc(m.title)}</b>
+    <div class="ov"><span>${m.language} · ${m.duration}</span><span>${esc(m.description).slice(0,60)}…</span>
+      <div class="bt"><button data-play="${m.id}" aria-label="Play ${esc(m.title)}">▶</button><button data-list="${m.id}" aria-label="Add or remove ${esc(m.title)} from My List">${inList?'✓':'+'}</button></div></div>
+    ${p ? `<i class="pb"><u style="width:${Math.min(100,p.t/p.d*100)}%"></u></i>` : ''}
+  </div>
+  <div class="cap"><div>${esc(m.title)}</div><small>${m.year} · ${m.genre} · ★ ${m.rating}</small></div></article>`;
+};
+const row = (t, a) => `<section class="row" data-t="${t}"><h2>${t}</h2><div class="sc">${a.map(card).join('')}</div></section>`;
+const grid = (t, a) => `<h2 class="grid-h">${t}</h2><div class="grid">${a.map(card).join('')}</div>`;
+const empty = (t, s) => `<div class="empty"><div>🎬</div><h3>${t}</h3><p>${s}</p></div>`;
+
+// =====================  RENDER THE PAGE  =====================
+function render() {
+  const {view, q} = state, scr = {};
+  document.querySelectorAll('.row').forEach(r => scr[r.dataset.t] = r.querySelector('.sc').scrollLeft); // keep scroll spots
+  const pool = items.filter(m => (!F.genre||m.genre===F.genre) && (!F.language||m.language===F.language) && (!F.year||m.year==F.year) && (!F.rating||m.rating>=+F.rating));
+  const filtered = F.genre||F.language||F.year||F.rating;
+  let h = '';
+  const showHero = view==='home' && !q;
+  $('#hero').hidden = !showHero; document.body.classList.toggle('nohero', !showHero);
+  if (q) {
+    const r = pool.filter(m => [m.title,m.genre,m.cast,m.language,m.year,m.type].join(' ').toLowerCase().includes(q.toLowerCase()));
+    h = r.length ? grid(`Results for “${esc(q)}”`, r) : empty('No results found', 'Try another title, genre, actor, language or year.');
+  } else if (view==='mylist' || view==='continue') {
+    const r = pool.filter(m => view==='mylist' ? list.includes(m.id) : cw[m.id]);
+    h = r.length ? grid(view==='mylist'?'My List':'Continue Watching', r)
+      : empty(view==='mylist'?'Your list is empty':'Nothing to continue', EMPTY[view==='mylist'?'My List':'Continue Watching']);
+  } else if (view==='new') {
+    const r = pool.filter(m => m.year>=2025).sort((a,b)=>b.rating-a.rating);
+    h = r.length ? grid('New & Popular', r) : empty('Nothing matches', 'Try changing the filters.');
+  } else {
+    const base = view==='movies' ? pool.filter(m=>m.type==='movie') : view==='tv' ? pool.filter(m=>m.type==='show') : pool;
+    ROWS.forEach(([t, f]) => { const r = f(base);
+      if (r.length) h += row(t, r);
+      else if (view==='home' && !filtered && EMPTY[t]) h += `<section class="row"><h2>${t}</h2><p class="em">${EMPTY[t]}</p></section>`; });
+    if (!h) h = empty('Nothing matches', 'Try changing the filters.');
+  }
+  $('#main').innerHTML = h;
+  document.querySelectorAll('.row').forEach(r => { if (scr[r.dataset.t]) r.querySelector('.sc').scrollLeft = scr[r.dataset.t] });
+  document.querySelectorAll('.links button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+}
+
+// =====================  HERO (auto-changing banner)  =====================
+let hi = 0, ht;
+function hero(i, fade) {
+  hi = i;
+  const draw = () => { const m = byId(FEATURED[hi]);
+    $('#hero').innerHTML = `<div class="slide" style="--a:${m.c1};--b:${m.c2}"><img class="bg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()"><h1>${esc(m.title)}</h1>
+      <div class="meta"><span>${m.genre}</span><span>${m.year}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span></div>
+      <p>${esc(m.description)}</p>
+      <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-info="${m.id}">ⓘ More Info</button></div></div>
+      <div class="dots">${FEATURED.map((_,k)=>`<button data-dot="${k}" class="${k==hi?'on':''}" aria-label="Show featured title ${k+1}"></button>`).join('')}</div>`; };
+  const s = $('#hero .slide');
+  if (fade && s) { s.classList.add('out'); setTimeout(draw, 350) } else draw();
+  clearInterval(ht); ht = setInterval(() => hero((hi+1)%FEATURED.length, true), 6000);
+}
+
+// =====================  MODAL (details)  =====================
+function openModal(id) {
+  const m = byId(id), inList = list.includes(m.id);
+  $('#modal').innerHTML = `<div class="md"><button class="x" id="mx" aria-label="Close">×</button>
+   <div class="bd" style="--a:${m.c1};--b:${m.c2}"><img class="bdimg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()"><div class="poster" style="--a:${m.c1};--b:${m.c2}">${m.poster?`<img src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">`:''}</div><h2>${esc(m.title)}</h2></div>
+   <div class="inf"><div class="meta"><span>${m.year}</span><span>${m.genre}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span><span>${m.type==='show'?'TV Show':'Movie'}</span></div>
+   <p>${esc(m.description)}</p><p><b>Cast:</b> ${esc(m.cast)}</p>
+   <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-list="${m.id}" style="color:var(--fg);background:#8883">${inList?'✓ In My List':'+ My List'}</button></div></div></div>`;
+  $('#modal').hidden = false; $('#mx').focus();
+}
+$('#modal').addEventListener('click', e => { if (e.target.id==='modal' || e.target.id==='mx') $('#modal').hidden = true });
+
+// =====================  MY LIST  =====================
+function toggleList(id) {
+  id = +id; const i = list.indexOf(id);
+  i < 0 ? list.push(id) : list.splice(i, 1);
+  sv('cw_list', list); toast(i < 0 ? 'Added to My List' : 'Removed from My List');
+  render();
+  if (!$('#modal').hidden) openModal(id);
+}
+
+// =====================  VIDEO PLAYER  =====================
+const v = $('#v'); let cur = null, last = 0;
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+function play(id) {
+  cur = byId(id); $('#modal').hidden = true; $('#player').hidden = false;
+  $('#ptitle').textContent = cur.title; $('#perr').hidden = true;
+  if (!cur.video) { $('#perr').hidden = false; return }
+  const s = cw[id]; v.src = cur.video;
+  v.onloadedmetadata = () => { if (s && s.t < v.duration - 5) v.currentTime = s.t };  // resume!
+  v.play().catch(() => {});
+}
+function closePlayer() {
+  save(); v.pause(); if (document.fullscreenElement) document.exitFullscreen();
+  $('#player').hidden = true; v.removeAttribute('src'); v.load(); render();
+}
+function save() { if (cur && v.duration && v.currentTime > 1) { cw[cur.id] = {t:v.currentTime, d:v.duration, ts:Date.now()}; sv('cw_watch', cw) } }
+v.onerror = () => { if (!$('#player').hidden) $('#perr').hidden = false };
+v.ontimeupdate = () => { $('#seek').value = v.duration ? v.currentTime/v.duration*1000 : 0; $('#tm').textContent = fmt(v.currentTime)+' / '+fmt(v.duration);
+  if (Date.now()-last > 2000) { save(); last = Date.now() } };
+v.onended = () => { delete cw[cur.id]; sv('cw_watch', cw) };
+v.onplay = () => $('#pp').textContent = '⏸'; v.onpause = () => { $('#pp').textContent = '▶'; save() };
+const toggle = () => v.paused ? v.play() : v.pause();
+const skip = n => v.currentTime = Math.max(0, Math.min(v.duration||0, v.currentTime+n));
+const fs = () => document.fullscreenElement ? document.exitFullscreen() : $('.pw').requestFullscreen();
+$('#pp').onclick = toggle; v.onclick = toggle; $('#back').onclick = () => skip(-10); $('#fwd').onclick = () => skip(10);
+$('#seek').oninput = e => v.currentTime = v.duration * e.target.value / 1000;
+$('#vol').oninput = e => { v.volume = e.target.value; v.muted = false };
+$('#mute').onclick = () => { v.muted = !v.muted; $('#mute').textContent = v.muted ? '🔇' : '🔊' };
+$('#spd').onchange = e => v.playbackRate = +e.target.value;
+$('#fs').onclick = fs; $('#pclose').onclick = closePlayer;
+if (!document.pictureInPictureEnabled) $('#pip').hidden = true;
+$('#pip').onclick = () => document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture();
+// Keyboard shortcuts: Space, ← →, M, F, Esc
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else $('#modal').hidden = true; return }
+  if ($('#player').hidden || e.target.matches('select,input')) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); toggle() } else if (k === 'arrowleft') skip(-10);
+  else if (k === 'arrowright') skip(10); else if (k === 'm') $('#mute').click(); else if (k === 'f') fs();
+});
+
+// =====================  CLICKS (cards, buttons, hero)  =====================
+document.addEventListener('click', e => {
+  const t = e.target, d = s => t.closest(s);
+  if (d('[data-play]')) return play(d('[data-play]').dataset.play);
+  if (d('[data-list]')) { e.stopPropagation(); return toggleList(d('[data-list]').dataset.list) }
+  if (d('[data-info]')) return openModal(d('[data-info]').dataset.info);
+  if (d('[data-dot]')) return hero(+d('[data-dot]').dataset.dot);
+  if (d('.card')) return openModal(d('.card').dataset.id);
+  if (d('[data-view]')) { state.view = d('[data-view]').dataset.view; state.q = ''; $('#q').value = ''; $('#clr').hidden = true;
+    $('#links').classList.remove('open'); $('#pm').hidden = true; render(); scrollTo(0,0); return }
+  if (d('[data-act]')) { $('#pm').hidden = true;
+    if (d('[data-act]').dataset.act === 'profile') toast('Signed in as Manveer (demo profile)');
+    else if (confirm('Reset My List and Continue Watching?')) { list = []; cw = {}; sv('cw_list', list); sv('cw_watch', cw); render(); toast('Saved data cleared') } return }
+  if (d('[data-sug]')) { $('#q').value = d('[data-sug]').dataset.sug; doSearch(); return }
+  if (!d('#pm') && !d('#prof')) $('#pm').hidden = true;
+  if (!d('#sug') && !d('#q')) $('#sug').hidden = true;
+});
+$('#prof').onclick = () => $('#pm').hidden = !$('#pm').hidden;
+$('#burger').onclick = () => $('#links').classList.toggle('open');
+
+// =====================  SEARCH  =====================
+function doSearch() { state.q = $('#q').value.trim(); $('#clr').hidden = !state.q; $('#sug').hidden = true; render(); scrollTo(0,0) }
+$('#sbtn').onclick = () => { $('#sbox').classList.toggle('open'); $('#q').focus() };
+$('#q').addEventListener('input', e => {
+  const val = e.target.value.trim().toLowerCase();
+  const s = val ? items.filter(m => m.title.toLowerCase().includes(val)).slice(0,5) : [];
+  $('#sug').innerHTML = s.map(m => `<button data-sug="${esc(m.title)}">🔍 ${esc(m.title)} <small>${m.year}</small></button>`).join('');
+  $('#sug').hidden = !s.length; state.q = e.target.value.trim(); $('#clr').hidden = !state.q; render();
+});
+$('#clr').onclick = () => { $('#q').value = ''; doSearch(); $('#q').focus() };
+
+// =====================  FILTERS + THEME  =====================
+function fill(sel, label, vals, key) {
+  $(sel).innerHTML = `<option value="">${label}</option>` + vals.map(x => `<option value="${x[0]}">${x[1]}</option>`).join('');
+  $(sel).onchange = e => { F[key] = e.target.value; render() };
+}
+const uniq = k => [...new Set(items.map(m => m[k]))].sort();
+fill('#fg','All genres',uniq('genre').map(x=>[x,x]),'genre');
+fill('#fl','All languages',uniq('language').map(x=>[x,x]),'language');
+fill('#fy','All years',uniq('year').reverse().map(x=>[x,x]),'year');
+fill('#fr','Any rating',[[7,'7+ ★'],[8,'8+ ★'],[8.5,'8.5+ ★']],'rating');
+document.documentElement.dataset.theme = ls('cw_theme', 'dark');
+$('#theme').onclick = () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; sv('cw_theme', t) };
+addEventListener('scroll', () => $('#nav').classList.toggle('scrolled', scrollY > 40));
+
+// =====================  START  =====================
+setTimeout(() => { hero(0); render() }, 700);   // short delay so the loading skeletons are visible
+</script>
+</body>
+</html>

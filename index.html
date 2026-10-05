@@ -113,6 +113,12 @@ body.nohero .filters{padding-top:92px}
 #pclose{position:absolute;top:8px;right:14px;font-size:2rem;color:#fff}
 #toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,80px);background:var(--acc2);color:#fff;padding:10px 20px;border-radius:24px;z-index:300;transition:transform .3s}
 #toast.show{transform:translate(-50%,0)}
+.auth{width:min(420px,94vw);padding:28px 26px;display:grid;gap:12px}
+.auth h2{font-size:1.5rem}.auth p{color:var(--mut);font-size:.92rem}
+.auth label{display:grid;gap:4px;font-size:.9rem}
+.auth input{padding:10px 12px;border-radius:8px;border:1px solid #8886;background:var(--bg)}
+.auth .b.s{color:var(--fg);background:#8883}
+#aerr{color:#ff8a8a;min-height:1.3em}
 footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
 /* Mobile */
 @media(max-width:800px){
@@ -140,7 +146,7 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
     <button id="theme" aria-label="Toggle dark/light mode">🌓</button>
     <button id="prof" aria-label="Profile menu" aria-haspopup="true"><span class="avatar">M</span></button>
     <div id="pm" hidden>
-      <button data-act="profile">👤 Profile</button><button data-view="mylist">📌 My List</button><button data-view="continue">⏯ Continue Watching</button><button data-act="settings">⚙ Settings</button>
+      <button data-act="profile">👤 Profile</button><button data-view="mylist">📌 My List</button><button data-view="continue">⏯ Continue Watching</button><button data-act="settings">⚙ Settings</button><button data-act="auth" id="authbtn">🔐 Sign in</button>
     </div>
   </div>
 </nav>
@@ -152,7 +158,7 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   <!-- Loading skeletons (replaced when the page is ready) -->
   <div class="sc"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
 </main>
-<footer>Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash.</footer>
+<footer>CineWave is an original demo project. Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash.</footer>
 
 <div class="mo" id="modal" hidden role="dialog" aria-modal="true" aria-label="Title details"></div>
 <div class="pl" id="player" hidden>
@@ -171,11 +177,32 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   </div>
 </div>
 <div id="toast" role="status"></div>
+<!-- Sign in / create account box (opened from the profile menu) -->
+<div class="mo" id="authm" hidden role="dialog" aria-modal="true" aria-label="Sign in">
+  <form class="md auth" id="authf">
+    <button type="button" class="x" id="authx" aria-label="Close">×</button>
+    <h2>Welcome to CineWave</h2>
+    <p>Sign in to keep My List and Continue Watching on every device.</p>
+    <label>Email<input id="em" type="email" required autocomplete="email"></label>
+    <label>Password (6+ characters)<input id="pw" type="password" required minlength="6" autocomplete="current-password"></label>
+    <p id="aerr" role="alert"></p>
+    <div class="btns"><button class="b p" type="submit">Sign in</button><button class="b s" type="button" id="asu">Create account</button></div>
+  </form>
+</div>
 
+<!-- Supabase client library (loaded from the internet; the site still works as a guest without it) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ---------- 3. JAVASCRIPT ----------
 
-// =====================  DATA: the titles live here  =====================
+// =====================  BACKEND SETTINGS (Supabase)  =====================
+// Paste your own two values between the quotes. Both are safe to be public:
+// the database rules (Row Level Security) decide who can see what.
+// Leave them as they are and CineWave simply works as before, with data saved in this browser only.
+const SUPABASE_URL = 'PASTE_YOUR_PROJECT_URL_HERE';   // looks like https://abcdxyz.supabase.co
+const SUPABASE_KEY = 'PASTE_YOUR_PUBLIC_KEY_HERE';    // the anon / publishable key (NEVER the secret key)
+
+// =====================  DATA: the demo titles live here  =====================
 // One line = one title. Order of the fields:
 // [id, type ('movie' or 'show'), title, year, genre, language, rating, duration,
 //  colour1, colour2 (poster colours), cast, description]
@@ -338,7 +365,7 @@ $('#modal').addEventListener('click', e => { if (e.target.id==='modal' || e.targ
 function toggleList(id) {
   id = +id; const i = list.indexOf(id);
   i < 0 ? list.push(id) : list.splice(i, 1);
-  sv('cw_list', list); toast(i < 0 ? 'Added to My List' : 'Removed from My List');
+  saveList(id, i < 0); toast(i < 0 ? 'Added to My List' : 'Removed from My List');
   render();
   if (!$('#modal').hidden) openModal(id);
 }
@@ -355,15 +382,15 @@ function play(id) {
   v.play().catch(() => {});
 }
 function closePlayer() {
-  save(); v.pause(); if (document.fullscreenElement) document.exitFullscreen();
+  save(true); v.pause(); if (document.fullscreenElement) document.exitFullscreen();
   $('#player').hidden = true; v.removeAttribute('src'); v.load(); render();
 }
-function save() { if (cur && v.duration && v.currentTime > 1) { cw[cur.id] = {t:v.currentTime, d:v.duration, ts:Date.now()}; sv('cw_watch', cw) } }
+function save(force) { if (cur && v.duration && v.currentTime > 1) { cw[cur.id] = {t:v.currentTime, d:v.duration, ts:Date.now()}; if (user) pushWatch(cur.id, force); else sv('cw_watch', cw) } }
 v.onerror = () => { if (!$('#player').hidden) $('#perr').hidden = false };
 v.ontimeupdate = () => { $('#seek').value = v.duration ? v.currentTime/v.duration*1000 : 0; $('#tm').textContent = fmt(v.currentTime)+' / '+fmt(v.duration);
   if (Date.now()-last > 2000) { save(); last = Date.now() } };
-v.onended = () => { delete cw[cur.id]; sv('cw_watch', cw) };
-v.onplay = () => $('#pp').textContent = '⏸'; v.onpause = () => { $('#pp').textContent = '▶'; save() };
+v.onended = () => { delete cw[cur.id]; dropWatch(cur.id) };
+v.onplay = () => $('#pp').textContent = '⏸'; v.onpause = () => { $('#pp').textContent = '▶'; save(true) };
 const toggle = () => v.paused ? v.play() : v.pause();
 const skip = n => v.currentTime = Math.max(0, Math.min(v.duration||0, v.currentTime+n));
 const fs = () => document.fullscreenElement ? document.exitFullscreen() : $('.pw').requestFullscreen();
@@ -377,7 +404,7 @@ if (!document.pictureInPictureEnabled) $('#pip').hidden = true;
 $('#pip').onclick = () => document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture();
 // Keyboard shortcuts: Space, ← →, M, F, Esc
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else $('#modal').hidden = true; return }
+  if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else { $('#modal').hidden = true; $('#authm').hidden = true } return }
   if ($('#player').hidden || e.target.matches('select,input')) return;
   const k = e.key.toLowerCase();
   if (k === ' ') { e.preventDefault(); toggle() } else if (k === 'arrowleft') skip(-10);
@@ -394,9 +421,11 @@ document.addEventListener('click', e => {
   if (d('.card')) return openModal(d('.card').dataset.id);
   if (d('[data-view]')) { state.view = d('[data-view]').dataset.view; state.q = ''; $('#q').value = ''; $('#clr').hidden = true;
     $('#links').classList.remove('open'); $('#pm').hidden = true; render(); scrollTo(0,0); return }
-  if (d('[data-act]')) { $('#pm').hidden = true;
-    if (d('[data-act]').dataset.act === 'profile') toast('Signed in as Manveer (demo profile)');
-    else if (confirm('Reset My List and Continue Watching?')) { list = []; cw = {}; sv('cw_list', list); sv('cw_watch', cw); render(); toast('Saved data cleared') } return }
+  if (d('[data-act]')) { $('#pm').hidden = true; const act = d('[data-act]').dataset.act;
+    if (act === 'profile') toast(user ? 'Signed in as ' + user.email : 'Guest profile. Sign in to sync your list');
+    else if (act === 'auth') { user ? sb.auth.signOut() : openAuth() }
+    else if (confirm('Reset My List and Continue Watching?')) resetData();
+    return }
   if (d('[data-sug]')) { $('#q').value = d('[data-sug]').dataset.sug; doSearch(); return }
   if (!d('#pm') && !d('#prof')) $('#pm').hidden = true;
   if (!d('#sug') && !d('#q')) $('#sug').hidden = true;
@@ -428,6 +457,92 @@ fill('#fr','Any rating',[[7,'7+ ★'],[8,'8+ ★'],[8.5,'8.5+ ★']],'rating');
 document.documentElement.dataset.theme = ls('cw_theme', 'dark');
 $('#theme').onclick = () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; sv('cw_theme', t) };
 addEventListener('scroll', () => $('#nav').classList.toggle('scrolled', scrollY > 40));
+
+// =====================  ACCOUNTS + CLOUD SYNC (Supabase)  =====================
+// Guest (not signed in): My List and Continue Watching live in this browser (localStorage), as before.
+// Signed in: they live in your Supabase database, so every device shows the same data.
+let sb = null, user = null;
+try { if (window.supabase && SUPABASE_URL.startsWith('https://')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) }
+catch (e) { console.warn('Supabase not started', e) }
+
+// Runs a database request and shows a friendly message if it fails
+const cloud = async p => { try { const r = await p; if (r.error) throw r.error } catch (e) { console.warn(e); toast('Could not sync. Check your connection.') } };
+
+function saveList(id, added) {                      // called when you add or remove a title
+  if (!user) return sv('cw_list', list);
+  cloud(added ? sb.from('my_list').upsert({user_id:user.id, title_id:id})
+              : sb.from('my_list').delete().eq('user_id', user.id).eq('title_id', id));
+}
+let lastPush = 0, lastKey = '';
+function pushWatch(id, force) {                      // saves the playback position (at most every 10 seconds, or when forced)
+  const p = cw[id]; if (!user || !p) return;
+  const key = id + ':' + Math.round(p.t);
+  if (key === lastKey || (!force && Date.now() - lastPush < 10000)) return;
+  lastPush = Date.now(); lastKey = key;
+  cloud(sb.from('watch_progress').upsert({user_id:user.id, title_id:id, position_seconds:p.t, duration_seconds:p.d, updated_at:new Date(p.ts).toISOString()}));
+}
+function dropWatch(id) {                             // called when a title is finished
+  if (!user) return sv('cw_watch', cw);
+  lastKey = ''; cloud(sb.from('watch_progress').delete().eq('user_id', user.id).eq('title_id', id));
+}
+function resetData() {                               // Profile > Settings
+  list = []; cw = {};
+  if (user) { cloud(sb.from('my_list').delete().eq('user_id', user.id)); cloud(sb.from('watch_progress').delete().eq('user_id', user.id)) }
+  else { sv('cw_list', list); sv('cw_watch', cw) }
+  render(); toast('Saved data cleared');
+}
+
+// After signing in: move this browser's guest data into the account, then load everything from the database
+async function mergeAndLoad() {
+  try {
+    const [a, b] = await Promise.all([
+      sb.from('my_list').select('title_id'),
+      sb.from('watch_progress').select('title_id,position_seconds,duration_seconds,updated_at')]);
+    if (a.error) throw a.error; if (b.error) throw b.error;
+    const cloudList = a.data.map(r => r.title_id), cloudCw = {};
+    b.data.forEach(r => cloudCw[r.title_id] = {t:r.position_seconds, d:r.duration_seconds, ts:Date.parse(r.updated_at)});
+    const gl = ls('cw_list', []), gw = ls('cw_watch', {});                  // guest data from this browser
+    const newList = gl.filter(id => !cloudList.includes(id));
+    const newWatch = Object.keys(gw).filter(id => !cloudCw[id] || gw[id].ts > cloudCw[id].ts);   // keep the newer position
+    if (newList.length) { const r = await sb.from('my_list').upsert(newList.map(id => ({user_id:user.id, title_id:id}))); if (r.error) throw r.error }
+    if (newWatch.length) { const r = await sb.from('watch_progress').upsert(newWatch.map(id => ({user_id:user.id, title_id:+id,
+      position_seconds:gw[id].t, duration_seconds:gw[id].d, updated_at:new Date(gw[id].ts).toISOString()}))); if (r.error) throw r.error }
+    sv('cw_list', []); sv('cw_watch', {});                                   // now safely in the account, so clear the local copy
+    list = [...new Set([...cloudList, ...gl])]; newWatch.forEach(id => cloudCw[id] = gw[id]); cw = cloudCw;
+  } catch (e) { console.warn(e); toast('Could not load your account data') }
+  render();
+}
+// Called whenever someone signs in or out
+async function onUser(u) {
+  if (!u && !user) return;                           // nothing changed
+  if (u && user && u.id === user.id) return;        // same person (e.g. token refresh)
+  user = u; updateAuthUI();
+  if (u) { toast('Signed in as ' + u.email); await mergeAndLoad() }
+  else { list = ls('cw_list', []); cw = ls('cw_watch', {}); render(); toast('Signed out') }
+}
+function updateAuthUI() {
+  $('#authbtn').textContent = user ? '🚪 Sign out' : '🔐 Sign in';
+  document.querySelector('.avatar').textContent = user ? user.email[0].toUpperCase() : 'G';
+}
+
+// Sign-in box
+function openAuth() {
+  $('#authm').hidden = false; $('#em').focus();
+  $('#aerr').textContent = sb ? '' : 'Accounts are not set up yet. Add your Supabase values in BACKEND SETTINGS.';
+}
+async function authGo(mode) {
+  const email = $('#em').value.trim(), password = $('#pw').value, err = $('#aerr');
+  if (!sb) { openAuth(); return }
+  err.textContent = 'Please wait…';
+  const r = mode === 'in' ? await sb.auth.signInWithPassword({email, password}) : await sb.auth.signUp({email, password});
+  if (r.error) { err.textContent = r.error.message; return }
+  if (mode === 'up' && !r.data.session) { err.textContent = 'Account created. Check your email to confirm it, then sign in.'; return }
+  err.textContent = ''; $('#pw').value = ''; $('#authm').hidden = true;
+}
+$('#authf').addEventListener('submit', e => { e.preventDefault(); authGo('in') });
+$('#asu').onclick = () => { if ($('#authf').reportValidity()) authGo('up') };
+$('#authm').addEventListener('click', e => { if (e.target.id === 'authm' || e.target.id === 'authx') $('#authm').hidden = true });
+if (sb) sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onUser(session ? session.user : null), 0) });   // fires once at page load too
 
 // =====================  START  =====================
 setTimeout(() => { hero(0); render() }, 700);   // short delay so the loading skeletons are visible

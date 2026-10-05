@@ -14,7 +14,8 @@ A Netflix-style streaming website UI built with **only HTML, CSS and vanilla Jav
 - Details popup for every title
 - Working HTML5 video player: speed, skip, volume, fullscreen, picture-in-picture, keyboard shortcuts (Space, ← →, M, F)
 - My List and Continue Watching saved in `localStorage` (resumes where you stopped)
-- Optional accounts: sign in to keep My List and Continue Watching on every device (Supabase)
+- Login wall: visitors must sign in or create an account; sign-up details (name, date of birth, country, language, favourite genres) are saved, can be edited under Profile, and My List and Continue Watching follow the account (Supabase)
+- Real, legally free films: public domain and Creative Commons titles from the Internet Archive and the Blender Foundation, with the licence shown on each title
 - Dark / light theme, responsive layout, loading skeletons, friendly error states, keyboard-accessible
 
 ## Run it locally
@@ -43,18 +44,24 @@ Video links are in the `VIDEOS` list. Poster and backdrop image links are set in
 
 I used Claude (an AI assistant made by Anthropic) on this project.
 
-- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, to explain how parts of the code work, and to add the Supabase sign-in and cloud sync of My List and watch progress.
+- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, to explain how parts of the code work, and to add the Supabase login wall, saved profile details, cloud sync of My List and watch progress, and the real free films.
 - **What I changed myself:** [fill in after your commits, for example: I added the title "..." to the data and added the "Top Rated 8.5+" row, each as its own commit.]
 
-## Accounts and sync (Supabase)
+## Accounts, profile and sync (Supabase)
 
-Without any setup the site works as a guest and saves data in the browser. To turn on accounts:
+When Supabase is set up, nobody can use the site until they sign in or create an account. (If you leave the Supabase values empty, the site stays open as a guest demo.) The login wall is a front-end gate: it controls the interface, while the database rules protect each person's saved data.
 
-1. Create a free project at supabase.com and run `supabase-setup.sql` in its SQL Editor. It creates the `my_list` and `watch_progress` tables and the Row Level Security rules, so each user can only read and change their own rows.
+1. Create a free project at supabase.com. In its SQL Editor run `supabase-setup.sql` (tables `my_list` and `watch_progress`), then `supabase-profiles.sql` (table `profiles` and the automatic copy of sign-up details). Both use Row Level Security, so each user can only read and change their own rows.
 2. Put your Project URL and public (anon / publishable) key in the `BACKEND SETTINGS` section at the top of the script in `index.html`. These two values are meant to be public. Never put the secret / service_role key in the file.
 3. In Supabase, set Authentication > URL Configuration > Site URL to your live link.
 
-When someone signs in, the data saved in that browser is merged into their account (the newer watch position wins), and from then on My List and Continue Watching are read from and written to the database.
+Passwords are handled by Supabase Auth and are never stored by this project. The profile holds only what the sign-up form asks for. Collect only what you need, and tell users what is stored.
+
+When someone signs in, anything saved in that browser as a guest is merged into their account (the newer watch position wins), and from then on My List and Continue Watching are read from and written to the database.
+
+## Free films
+
+Real titles are the ones with a video link in the data list (they appear in the "Free Classics & Open Films" row). Each one shows its licence in the details popup. Public domain status can differ by country, so check the licence before reusing a film elsewhere.
 
 ## Tech
 
@@ -62,5 +69,7 @@ HTML5 · CSS3 · Vanilla JavaScript · localStorage · Supabase (Auth + Postgres
 
 ## Credits
 
-- Demo videos: Blender Foundation open movies (CC-BY)
+- Free films: Nosferatu (1922), A Trip to the Moon (1902), The Cabinet of Dr. Caligari (1920), Raja Harishchandra (1913) and Sita Sings the Blues (2008) from the [Internet Archive](https://archive.org/) (public domain / CC0)
+- Blender Foundation open movies: Big Buck Bunny, Sintel, Tears of Steel, Elephants Dream (Creative Commons Attribution)
+- Fictional demo titles use placeholder videos from the Blender movies above
 - Demo photos: [Picsum Photos](https://picsum.photos/) (Unsplash)

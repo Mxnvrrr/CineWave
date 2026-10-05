@@ -119,6 +119,17 @@ body.nohero .filters{padding-top:92px}
 .auth input{padding:10px 12px;border-radius:8px;border:1px solid #8886;background:var(--bg)}
 .auth .b.s{color:var(--fg);background:#8883}
 #aerr{color:#ff8a8a;min-height:1.3em}
+.mo.gate{z-index:150;background:radial-gradient(circle at 25% 15%,#8a3ffc66,transparent 50%),radial-gradient(circle at 80% 85%,#ff3d4a55,transparent 50%),var(--bg)}
+.auth{max-height:94vh}
+.auth fieldset{border:1px solid #8884;border-radius:8px;padding:8px 12px}
+.auth legend{font-size:.85rem;color:var(--mut);padding:0 6px}
+.auth .chk{display:flex;gap:8px;align-items:flex-start;font-size:.85rem}
+.auth .chk input{padding:0;margin-top:3px}
+.gl{display:flex;flex-wrap:wrap;gap:6px 16px}
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;padding:8px;border-radius:8px;background:#8883;font-weight:700}
+.tabs button.on{background:linear-gradient(90deg,var(--acc),#ff7a3d);color:#fff}
+.cr{font-size:.8rem;border-left:3px solid var(--acc2);padding-left:10px}
 footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
 /* Mobile */
 @media(max-width:800px){
@@ -158,7 +169,7 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   <!-- Loading skeletons (replaced when the page is ready) -->
   <div class="sc"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
 </main>
-<footer>CineWave is an original demo project. Video: Blender Foundation open movies (CC-BY). Photos: Picsum / Unsplash.</footer>
+<footer>CineWave is an original demo project. Free films: Internet Archive (public domain / CC0) and Blender Foundation open movies (CC BY). Demo photos: Picsum / Unsplash.</footer>
 
 <div class="mo" id="modal" hidden role="dialog" aria-modal="true" aria-label="Title details"></div>
 <div class="pl" id="player" hidden>
@@ -177,18 +188,30 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   </div>
 </div>
 <div id="toast" role="status"></div>
-<!-- Sign in / create account box (opened from the profile menu) -->
-<div class="mo" id="authm" hidden role="dialog" aria-modal="true" aria-label="Sign in">
+<!-- Login wall: visitors must sign in or create an account before they can use the site -->
+<div class="mo gate" id="authm" hidden role="dialog" aria-modal="true" aria-label="Sign in or create an account">
   <form class="md auth" id="authf">
-    <button type="button" class="x" id="authx" aria-label="Close">×</button>
+    <button type="button" class="x" id="authx" aria-label="Close" hidden>×</button>
     <h2>Welcome to CineWave</h2>
-    <p>Sign in to keep My List and Continue Watching on every device.</p>
+    <p id="asb">Sign in to start watching.</p>
+    <div class="tabs"><button type="button" id="tin" class="on">Sign in</button><button type="button" id="tup">Create account</button></div>
+    <!-- Extra details, only shown when creating an account. They are saved in the "profiles" table. -->
+    <div id="upf" hidden style="display:grid;gap:12px">
+      <label>Full name<input id="fn" autocomplete="name"></label>
+      <label>Date of birth (optional)<input id="dob" type="date"></label>
+      <label>Country (optional)<input id="co" autocomplete="country-name"></label>
+      <label>Preferred language<select id="pl"></select></label>
+      <fieldset><legend>Favourite genres</legend><div class="gl" id="gl"></div></fieldset>
+      <label class="chk"><input id="ag" type="checkbox"> I understand this is a demo project and agree to my details being stored to run my account.</label>
+    </div>
     <label>Email<input id="em" type="email" required autocomplete="email"></label>
     <label>Password (6+ characters)<input id="pw" type="password" required minlength="6" autocomplete="current-password"></label>
     <p id="aerr" role="alert"></p>
-    <div class="btns"><button class="b p" type="submit">Sign in</button><button class="b s" type="button" id="asu">Create account</button></div>
+    <button class="b p" type="submit" id="abtn">Sign in</button>
   </form>
 </div>
+<!-- Profile box (Profile menu > Profile) -->
+<div class="mo" id="profm" hidden role="dialog" aria-modal="true" aria-label="Your profile"></div>
 
 <!-- Supabase client library (loaded from the internet; the site still works as a guest without it) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -206,6 +229,7 @@ const SUPABASE_KEY = 'sb_publishable_p1GEcBIsz2mEYzchnGyg-Q_GnJVhoO5';    // the
 // One line = one title. Order of the fields:
 // [id, type ('movie' or 'show'), title, year, genre, language, rating, duration,
 //  colour1, colour2 (poster colours), cast, description]
+// Real, legally free films add three more values at the end: video link, poster link, licence/credit text.
 const RAW = [
 [1,'movie','Neon Horizon',2026,'Sci-Fi','English',8.6,'2h 8m','#ff3d4a','#2a0a4a','Ava Lin, Marcus Cole','A pilot races a collapsing city grid to reach the last open sky.'],
 [2,'movie','The Last Monsoon',2026,'Drama','Hindi',8.4,'2h 21m','#0f5c7a','#1b1147','Riya Mehta, Arjun Kapoor','A family gathers one final time before the old house is sold.'],
@@ -237,7 +261,17 @@ const RAW = [
 [28,'show','Sakura Squad',2025,'Animation','Japanese',8.6,'3 Seasons','#faa2c1','#1971c2','Voices: Yui Sato, Kaito Endo','Five school kids guard the city from playful spirits.'],
 [29,'show','Wild Frontiers',2024,'Documentary','English',8.4,'2 Seasons','#66a80f','#1b2a1b','Narrated by Owen Marsh','Life on the last untouched borders of our planet.'],
 [30,'show','Kolkata Files',2026,'Thriller','Bengali',8.2,'2 Seasons','#fd7e14','#1a1a2e','Ishaan Dutta, Rupa Sen','A retired journalist reopens a case the city forgot.'],
-[31,'movie','Monsoon Express',2026,'Action','Hindi',8.5,'2h 5m','#e8590c','#1a1a40','Aarav Sharma, Kiara Bose','A rescue train races a flood across the country.']
+[31,'movie','Monsoon Express',2026,'Action','Hindi',8.5,'2h 5m','#e8590c','#1a1a40','Aarav Sharma, Kiara Bose','A rescue train races a flood across the country.'],
+// ---- Real films you can legally watch: public domain, CC0 or Creative Commons (see the credit text on each) ----
+[32,'movie','Nosferatu',1922,'Horror','German',7.9,'1h 34m','#1b1b2f','#6b0f1a','Max Schreck, Gustav von Wangenheim, Greta Schroder','A property agent visits Count Orlok in Transylvania, and a plague follows him home. The classic silent vampire film.','https://archive.org/download/Nosferatu1922/Nosferatu-smaller2.mp4','https://archive.org/services/img/Nosferatu1922','Directed by F. W. Murnau (1922). Public domain. Source: Internet Archive.'],
+[33,'movie','A Trip to the Moon',1902,'Sci-Fi','French',8.0,'14m','#364fc7','#1a1a40','Georges Melies, Bleuette Bernon','Six astronomers launch a capsule at the Moon in Georges Melies pioneering science-fiction short.','https://archive.org/download/ATripToTheMoonGeorgeMelies/A%20Trip%20to%20the%20Moon-George%20M%C3%A9li%C3%A8s.mp4','https://archive.org/services/img/ATripToTheMoonGeorgeMelies','Directed by Georges Melies (1902). Public domain. Source: Internet Archive.'],
+[34,'movie','The Cabinet of Dr. Caligari',1920,'Horror','German',8.0,'1h 16m','#2b2b2b','#a61e4d','Werner Krauss, Conrad Veidt, Lil Dagover','A hypnotist and his sleepwalking patient are linked to a series of murders in this landmark German Expressionist film.','https://archive.org/download/thecabinetofdrcaligari/KabinettDesDoktorCaligariDas_512kb.mp4','https://archive.org/services/img/thecabinetofdrcaligari','Directed by Robert Wiene (1920). Public domain. Source: Internet Archive.'],
+[35,'movie','Raja Harishchandra',1913,'Drama','Hindi',6.2,'11m','#e8590c','#5c0a1e','D. D. Dabke, Anna Salunke, Bhalchandra Phalke','Often called the first Indian feature film. A king gives up everything to keep his word. Only part of the original footage survives.','https://archive.org/download/RajaHarishchandra1913/raja-harishchandra-1913.mp4','https://archive.org/services/img/RajaHarishchandra1913','Directed by Dadasaheb Phalke (1913). Marked CC0 / public domain on the Internet Archive.'],
+[36,'movie','Sita Sings the Blues',2008,'Animation','English',7.5,'1h 22m','#e64980','#364fc7','Written and animated by Nina Paley; songs by Annette Hanshaw','An animated musical retelling of the Ramayana, set against a modern break-up story and 1920s jazz songs.','https://archive.org/download/Sita_Sings_the_Blues/Sita_Sings_the_Blues.mp4','https://archive.org/services/img/Sita_Sings_the_Blues','By Nina Paley (2008). Released under CC0. Source: Internet Archive.'],
+[37,'movie','Big Buck Bunny',2008,'Animation','English',6.5,'10m','#66a80f','#1b2a1b','Animated short by the Blender Foundation','A giant, gentle rabbit takes revenge on three bullying rodents.','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4','','(c) Blender Foundation | peach.blender.org. Licensed CC BY 3.0.'],
+[38,'movie','Sintel',2010,'Animation','English',7.5,'15m','#f76707','#12006b','Voices: Halina Reijn, Thom Hoffman','A young woman searches for the baby dragon she once befriended.','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4','','(c) Blender Foundation | durian.blender.org. Licensed CC BY 3.0.'],
+[39,'movie','Tears of Steel',2012,'Sci-Fi','English',6.6,'12m','#0c8599','#1a0b3b','Derek de Lint, Sergio Hasselbaink, Vanja Rukavina','In Amsterdam, a group of warriors and scientists try to save the world from killer robots.','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4','','(c) Blender Foundation | mango.blender.org. Licensed CC BY 3.0.'],
+[40,'movie','Elephants Dream',2006,'Animation','English',6.2,'11m','#ffa94d','#5f3dc4','Voices: Cas Jansen, Tygo Gernandt','Two strange characters, Proog and Emo, explore a vast machine. The first open movie from the Blender Foundation.','https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4','','(c) Blender Foundation | orange.blender.org. Licensed CC BY 2.5.']
 ];
 // Demo videos (Blender Foundation open movies). Any direct .mp4 link works here.
 const VIDEOS = [
@@ -249,11 +283,13 @@ const VIDEOS = [
 // Turns each row above into an object the rest of the code can use, and adds the poster, backdrop and video address.
 const items = RAW.map(r => ({id:r[0],type:r[1],title:r[2],year:r[3],genre:r[4],language:r[5],rating:r[6],
   duration:r[7],c1:r[8],c2:r[9],cast:r[10],description:r[11],
-  // placeholder photos from picsum.photos (Unsplash); the number in the address gives each title its own picture
-  poster:'https://picsum.photos/seed/cinewave'+r[0]+'/400/600',
-  backdrop:'https://picsum.photos/seed/cinewave'+r[0]+'/1600/900',
-  video:VIDEOS[r[0]%4]}));
-const FEATURED = [15,13,2,21,1];          // ids shown in the hero banner
+  real: !!r[12],                                   // true for the real, legally free films
+  credit: r[14] || '',
+  // real films use their own video and poster; demo titles use placeholder photos from picsum.photos (Unsplash)
+  poster: r[12] ? (r[13] || '') : 'https://picsum.photos/seed/cinewave'+r[0]+'/400/600',
+  backdrop: r[12] ? '' : 'https://picsum.photos/seed/cinewave'+r[0]+'/1600/900',
+  video: r[12] || VIDEOS[r[0]%4]}));
+const FEATURED = [15,32,13,36,2,21,1];          // ids shown in the hero banner
 const INDIAN = ['Hindi','Punjabi','Tamil','Telugu','Malayalam','Kannada','Bengali','Marathi','Gujarati'];
 
 // =====================  HELPERS  =====================
@@ -272,6 +308,7 @@ function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');cl
 const g = n => a => a.filter(m => m.genre === n);
 const ROWS = [
  ['Trending Now', a => [...a].sort((x,y)=>y.rating-x.rating).slice(0,12)],
+ ['Free Classics & Open Films', a => a.filter(m=>m.real)],
  ['Top Rated 8.5+', a => a.filter(m=>m.rating>=8.5).sort((x,y)=>y.rating-x.rating)],
  ['Popular Movies', a => a.filter(m=>m.type==='movie').slice(0,12)],
  ['Popular TV Shows', a => a.filter(m=>m.type==='show')],
@@ -280,7 +317,7 @@ const ROWS = [
  ['My List', a => a.filter(m=>list.includes(m.id))],
  ['Recommended For You', a => a.filter(m=>m.id%2)],
  ['Action',g('Action')],['Comedy',g('Comedy')],['Drama',g('Drama')],['Thriller',g('Thriller')],
- ['Sci-Fi',g('Sci-Fi')],['Animation',g('Animation')],['Documentaries',g('Documentary')],
+ ['Sci-Fi',g('Sci-Fi')],['Horror',g('Horror')],['Animation',g('Animation')],['Documentaries',g('Documentary')],
  ['Indian Cinema', a => a.filter(m=>INDIAN.includes(m.language))],
  ['International', a => a.filter(m=>!INDIAN.includes(m.language))]
 ];
@@ -339,7 +376,7 @@ let hi = 0, ht;
 function hero(i, fade) {
   hi = i;
   const draw = () => { const m = byId(FEATURED[hi]);
-    $('#hero').innerHTML = `<div class="slide" style="--a:${m.c1};--b:${m.c2}"><img class="bg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()"><h1>${esc(m.title)}</h1>
+    $('#hero').innerHTML = `<div class="slide" style="--a:${m.c1};--b:${m.c2}">${m.backdrop?`<img class="bg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()">`:''}<h1>${esc(m.title)}</h1>
       <div class="meta"><span>${m.genre}</span><span>${m.year}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span></div>
       <p>${esc(m.description)}</p>
       <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-info="${m.id}">ⓘ More Info</button></div></div>
@@ -353,9 +390,9 @@ function hero(i, fade) {
 function openModal(id) {
   const m = byId(id), inList = list.includes(m.id);
   $('#modal').innerHTML = `<div class="md"><button class="x" id="mx" aria-label="Close">×</button>
-   <div class="bd" style="--a:${m.c1};--b:${m.c2}"><img class="bdimg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()"><div class="poster" style="--a:${m.c1};--b:${m.c2}">${m.poster?`<img src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">`:''}</div><h2>${esc(m.title)}</h2></div>
-   <div class="inf"><div class="meta"><span>${m.year}</span><span>${m.genre}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span><span>${m.type==='show'?'TV Show':'Movie'}</span></div>
-   <p>${esc(m.description)}</p><p><b>Cast:</b> ${esc(m.cast)}</p>
+   <div class="bd" style="--a:${m.c1};--b:${m.c2}">${m.backdrop?`<img class="bdimg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()">`:''}<div class="poster" style="--a:${m.c1};--b:${m.c2}">${m.poster?`<img src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">`:''}</div><h2>${esc(m.title)}</h2></div>
+   <div class="inf"><div class="meta"><span>${m.year}</span><span>${m.genre}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span><span>${m.type==='show'?'TV Show':'Movie'}</span>${m.real?'<span>Free to watch</span>':''}</div>
+   <p>${esc(m.description)}</p><p><b>Cast:</b> ${esc(m.cast)}</p>${m.credit?`<p class="cr">${esc(m.credit)}</p>`:''}
    <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-list="${m.id}" style="color:var(--fg);background:#8883">${inList?'✓ In My List':'+ My List'}</button></div></div></div>`;
   $('#modal').hidden = false; $('#mx').focus();
 }
@@ -404,7 +441,7 @@ if (!document.pictureInPictureEnabled) $('#pip').hidden = true;
 $('#pip').onclick = () => document.pictureInPictureElement ? document.exitPictureInPicture() : v.requestPictureInPicture();
 // Keyboard shortcuts: Space, ← →, M, F, Esc
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else { $('#modal').hidden = true; $('#authm').hidden = true } return }
+  if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else { $('#modal').hidden = true; $('#profm').hidden = true; if (!locked) $('#authm').hidden = true } return }
   if ($('#player').hidden || e.target.matches('select,input')) return;
   const k = e.key.toLowerCase();
   if (k === ' ') { e.preventDefault(); toggle() } else if (k === 'arrowleft') skip(-10);
@@ -422,7 +459,7 @@ document.addEventListener('click', e => {
   if (d('[data-view]')) { state.view = d('[data-view]').dataset.view; state.q = ''; $('#q').value = ''; $('#clr').hidden = true;
     $('#links').classList.remove('open'); $('#pm').hidden = true; render(); scrollTo(0,0); return }
   if (d('[data-act]')) { $('#pm').hidden = true; const act = d('[data-act]').dataset.act;
-    if (act === 'profile') toast(user ? 'Signed in as ' + user.email : 'Guest profile. Sign in to sync your list');
+    if (act === 'profile') openProfile();
     else if (act === 'auth') { user ? sb.auth.signOut() : openAuth() }
     else if (confirm('Reset My List and Continue Watching?')) resetData();
     return }
@@ -461,7 +498,7 @@ addEventListener('scroll', () => $('#nav').classList.toggle('scrolled', scrollY 
 // =====================  ACCOUNTS + CLOUD SYNC (Supabase)  =====================
 // Guest (not signed in): My List and Continue Watching live in this browser (localStorage), as before.
 // Signed in: they live in your Supabase database, so every device shows the same data.
-let sb = null, user = null;
+let sb = null, user = null, profile = null, amode = 'in', locked = false;
 try { if (window.supabase && SUPABASE_URL.startsWith('https://')) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) }
 catch (e) { console.warn('Supabase not started', e) }
 
@@ -516,33 +553,93 @@ async function mergeAndLoad() {
 async function onUser(u) {
   if (!u && !user) return;                           // nothing changed
   if (u && user && u.id === user.id) return;        // same person (e.g. token refresh)
-  user = u; updateAuthUI();
-  if (u) { toast('Signed in as ' + u.email); await mergeAndLoad() }
-  else { list = ls('cw_list', []); cw = ls('cw_watch', {}); render(); toast('Signed out') }
+  user = u; profile = null; updateAuthUI();
+  if (u) {
+    hideGate();
+    await Promise.all([loadProfile(), mergeAndLoad()]);
+    const n = (profile && profile.full_name) || (u.user_metadata && u.user_metadata.full_name) || '';
+    toast('Welcome' + (n ? ', ' + n.split(' ')[0] : ''));
+  } else { list = ls('cw_list', []); cw = ls('cw_watch', {}); render(); showGate(); toast('Signed out') }
+}
+async function loadProfile() {                       // the details saved when the account was created
+  const r = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle();
+  if (r.error) console.warn('profiles table not ready yet:', r.error.message); else profile = r.data;
+  updateAuthUI();
 }
 function updateAuthUI() {
+  const nm = user ? ((profile && profile.full_name) || (user.user_metadata && user.user_metadata.full_name) || user.email) : '';
   $('#authbtn').textContent = user ? '🚪 Sign out' : '🔐 Sign in';
-  document.querySelector('.avatar').textContent = user ? user.email[0].toUpperCase() : 'G';
+  document.querySelector('.avatar').textContent = nm ? nm[0].toUpperCase() : 'G';
 }
 
-// Sign-in box
-function openAuth() {
-  $('#authm').hidden = false; $('#em').focus();
+// ----- Login wall: nobody sees the site until they are signed in -----
+function showGate(msg) { locked = true; $('#authm').hidden = false; $('#authx').hidden = true; setMode('in'); if (msg) $('#aerr').textContent = msg }
+function hideGate() { locked = false; $('#authm').hidden = true }
+function openAuth() {                                // only used if sign-in is not configured
+  locked = false; $('#authm').hidden = false; $('#authx').hidden = false; $('#em').focus();
   $('#aerr').textContent = sb ? '' : 'Accounts are not set up yet. Add your Supabase values in BACKEND SETTINGS.';
+}
+function setMode(m) {                                // 'in' = sign in, 'up' = create account (shows the extra detail fields)
+  amode = m; const up = m === 'up';
+  $('#upf').hidden = !up; $('#fn').required = up; $('#ag').required = up;
+  $('#tin').classList.toggle('on', !up); $('#tup').classList.toggle('on', up);
+  $('#abtn').textContent = up ? 'Create account' : 'Sign in';
+  $('#asb').textContent = up ? 'Tell us a little about you to get started.' : 'Sign in to start watching.';
+  $('#pw').autocomplete = up ? 'new-password' : 'current-password'; $('#aerr').textContent = '';
 }
 async function authGo(mode) {
   const email = $('#em').value.trim(), password = $('#pw').value, err = $('#aerr');
   if (!sb) { openAuth(); return }
   err.textContent = 'Please wait…';
-  const r = mode === 'in' ? await sb.auth.signInWithPassword({email, password}) : await sb.auth.signUp({email, password});
+  let r;
+  if (mode === 'in') r = await sb.auth.signInWithPassword({email, password});
+  else {                                             // the details below are saved with the new account (and copied into the profiles table)
+    const meta = {full_name:$('#fn').value.trim(), date_of_birth:$('#dob').value, country:$('#co').value.trim(), preferred_language:$('#pl').value,
+      favourite_genres:[...document.querySelectorAll('#authf input[name=sg]:checked')].map(c => c.value)};
+    r = await sb.auth.signUp({email, password, options:{data:meta}});
+  }
   if (r.error) { err.textContent = r.error.message; return }
-  if (mode === 'up' && !r.data.session) { err.textContent = 'Account created. Check your email to confirm it, then sign in.'; return }
-  err.textContent = ''; $('#pw').value = ''; $('#authm').hidden = true;
+  if (mode === 'up' && !r.data.session) { setMode('in'); err.textContent = 'Account created. Check your email to confirm it, then sign in.'; return }
+  err.textContent = ''; $('#pw').value = '';        // success: onUser() closes the box and loads your data
 }
-$('#authf').addEventListener('submit', e => { e.preventDefault(); authGo('in') });
-$('#asu').onclick = () => { if ($('#authf').reportValidity()) authGo('up') };
-$('#authm').addEventListener('click', e => { if (e.target.id === 'authm' || e.target.id === 'authx') $('#authm').hidden = true });
-if (sb) sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onUser(session ? session.user : null), 0) });   // fires once at page load too
+$('#authf').addEventListener('submit', e => { e.preventDefault(); authGo(amode) });
+$('#tin').onclick = () => setMode('in'); $('#tup').onclick = () => setMode('up');
+$('#authm').addEventListener('click', e => { if (!locked && (e.target.id === 'authm' || e.target.id === 'authx')) $('#authm').hidden = true });
+$('#gl').innerHTML = uniq('genre').map(x => `<label class="chk"><input type="checkbox" name="sg" value="${esc(x)}"> ${esc(x)}</label>`).join('');
+$('#pl').innerHTML = ['', ...uniq('language')].map(x => `<option value="${esc(x)}">${x || 'Choose…'}</option>`).join('');
+
+// ----- Profile box: see and edit the saved details -----
+function openProfile() {
+  if (!user) { openAuth(); return }
+  const md = user.user_metadata || {};
+  const p = profile || {full_name:md.full_name, date_of_birth:md.date_of_birth, country:md.country, preferred_language:md.preferred_language, favourite_genres:md.favourite_genres};
+  const fav = p.favourite_genres || [];
+  $('#profm').innerHTML = `<form class="md auth" id="pf"><button type="button" class="x" id="pfx" aria-label="Close">×</button>
+   <h2>Your profile</h2><p>${esc(user.email)}</p>
+   <label>Full name<input id="pfn" required value="${esc(p.full_name || '')}"></label>
+   <label>Date of birth<input id="pdob" type="date" value="${esc(p.date_of_birth || '')}"></label>
+   <label>Country<input id="pco" value="${esc(p.country || '')}"></label>
+   <label>Preferred language<select id="ppl">${['', ...uniq('language')].map(l => `<option value="${esc(l)}"${l === (p.preferred_language || '') ? ' selected' : ''}>${l || 'Choose…'}</option>`).join('')}</select></label>
+   <fieldset><legend>Favourite genres</legend><div class="gl">${uniq('genre').map(x => `<label class="chk"><input type="checkbox" name="pg" value="${esc(x)}"${fav.includes(x) ? ' checked' : ''}> ${esc(x)}</label>`).join('')}</div></fieldset>
+   <p id="perr2" role="alert"></p><button class="b p" type="submit">Save changes</button></form>`;
+  $('#profm').hidden = false; $('#pfn').focus();
+}
+$('#profm').addEventListener('click', e => { if (e.target.id === 'profm' || e.target.id === 'pfx') $('#profm').hidden = true });
+$('#profm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const row = {id:user.id, full_name:$('#pfn').value.trim(), date_of_birth:$('#pdob').value || null, country:$('#pco').value.trim(), preferred_language:$('#ppl').value,
+    favourite_genres:[...document.querySelectorAll('#pf input[name=pg]:checked')].map(c => c.value), updated_at:new Date().toISOString()};
+  const r = await sb.from('profiles').upsert(row);
+  if (r.error) { $('#perr2').textContent = 'Could not save: ' + r.error.message; return }
+  profile = row; updateAuthUI(); $('#profm').hidden = true; toast('Profile saved');
+});
+
+// ----- Start the login wall -----
+const NEED_LOGIN = SUPABASE_URL.startsWith('https://');   // if you never set up Supabase, the site stays open as a guest demo
+if (sb) {
+  sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onUser(session ? session.user : null), 0) });   // fires once at page load too
+  sb.auth.getSession().then(r => { if (!r.data.session) showGate() }).catch(() => showGate());
+} else if (NEED_LOGIN) showGate('We could not load the sign-in service. Check your connection and refresh the page.');
 
 // =====================  START  =====================
 setTimeout(() => { hero(0); render() }, 700);   // short delay so the loading skeletons are visible

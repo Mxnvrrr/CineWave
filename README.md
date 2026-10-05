@@ -14,6 +14,7 @@ A Netflix-style streaming website UI built with **only HTML, CSS and vanilla Jav
 - Details popup for every title
 - Working HTML5 video player: speed, skip, volume, fullscreen, picture-in-picture, keyboard shortcuts (Space, ← →, M, F)
 - My List and Continue Watching saved in `localStorage` (resumes where you stopped)
+- Optional accounts: sign in to keep My List and Continue Watching on every device (Supabase)
 - Dark / light theme, responsive layout, loading skeletons, friendly error states, keyboard-accessible
 
 ## Run it locally
@@ -42,12 +43,22 @@ Video links are in the `VIDEOS` list. Poster and backdrop image links are set in
 
 I used Claude (an AI assistant made by Anthropic) on this project.
 
-- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, and to explain how parts of the code work.
+- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, to explain how parts of the code work, and to add the Supabase sign-in and cloud sync of My List and watch progress.
 - **What I changed myself:** [fill in after your commits, for example: I added the title "..." to the data and added the "Top Rated 8.5+" row, each as its own commit.]
+
+## Accounts and sync (Supabase)
+
+Without any setup the site works as a guest and saves data in the browser. To turn on accounts:
+
+1. Create a free project at supabase.com and run `supabase-setup.sql` in its SQL Editor. It creates the `my_list` and `watch_progress` tables and the Row Level Security rules, so each user can only read and change their own rows.
+2. Put your Project URL and public (anon / publishable) key in the `BACKEND SETTINGS` section at the top of the script in `index.html`. These two values are meant to be public. Never put the secret / service_role key in the file.
+3. In Supabase, set Authentication > URL Configuration > Site URL to your live link.
+
+When someone signs in, the data saved in that browser is merged into their account (the newer watch position wins), and from then on My List and Continue Watching are read from and written to the database.
 
 ## Tech
 
-HTML5 · CSS3 · Vanilla JavaScript · localStorage
+HTML5 · CSS3 · Vanilla JavaScript · localStorage · Supabase (Auth + Postgres)
 
 ## Credits
 

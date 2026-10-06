@@ -15,6 +15,11 @@ A Netflix-style streaming website UI built with **only HTML, CSS and vanilla Jav
 - Working HTML5 video player: speed, skip, volume, fullscreen, picture-in-picture, keyboard shortcuts (Space, ← →, M, F)
 - My List and Continue Watching saved in `localStorage` (resumes where you stopped)
 - Login wall: visitors must sign in or create an account; sign-up details (name, date of birth, country, language, favourite genres) are saved, can be edited under Profile, and My List and Continue Watching follow the account (Supabase)
+- Personalised rows: "Picked For You" (from your saved favourite genres and language) and "Because you watched / saved ..." (similar titles); unfinished titles move to the top
+- Ratings and reviews: 1 to 5 stars and a short review on every title, with a community average (only the first name is shown)
+- "More like this" in every details popup, a Resume button, arrow buttons on every row, a Surprise me dice, and `/` to jump to search
+- Original poster art drawn in code for titles without their own picture (also the fallback when a photo cannot load)
+- Settings: download all of your data as a JSON file, clear My List / Continue Watching, delete your profile details
 - Real, legally free films: public domain and Creative Commons titles from the Internet Archive and the Blender Foundation, with the licence shown on each title
 - Dark / light theme, responsive layout, loading skeletons, friendly error states, keyboard-accessible
 
@@ -44,20 +49,24 @@ Video links are in the `VIDEOS` list. Poster and backdrop image links are set in
 
 I used Claude (an AI assistant made by Anthropic) on this project.
 
-- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, to explain how parts of the code work, and to add the Supabase login wall, saved profile details, cloud sync of My List and watch progress, and the real free films.
+- **What I asked it:** I wrote a detailed brief (one file, only HTML, CSS and JavaScript, plus a long feature list) and asked it to generate the first full version of `index.html`. Later I asked it to add poster photos, to explain how to publish on GitHub Pages, to draft this README, to explain how parts of the code work, and to add the Supabase login wall, saved profile details, cloud sync of My List and watch progress, the real free films, ratings and reviews, personalised rows, generated poster art and the Settings box.
 - **What I changed myself:** [fill in after your commits, for example: I added the title "..." to the data and added the "Top Rated 8.5+" row, each as its own commit.]
 
 ## Accounts, profile and sync (Supabase)
 
 When Supabase is set up, nobody can use the site until they sign in or create an account. (If you leave the Supabase values empty, the site stays open as a guest demo.) The login wall is a front-end gate: it controls the interface, while the database rules protect each person's saved data.
 
-1. Create a free project at supabase.com. In its SQL Editor run `supabase-setup.sql` (tables `my_list` and `watch_progress`), then `supabase-profiles.sql` (table `profiles` and the automatic copy of sign-up details). Both use Row Level Security, so each user can only read and change their own rows.
+1. Create a free project at supabase.com. In its SQL Editor run, in this order: `supabase-setup.sql` (tables `my_list` and `watch_progress`), `supabase-profiles.sql` (table `profiles` and the automatic copy of sign-up details) and `supabase-extras.sql` (table `reviews` and a policy that lets people delete their own profile row). All of them use Row Level Security: people can only read and change their own rows, except reviews, which every signed-in user can read.
 2. Put your Project URL and public (anon / publishable) key in the `BACKEND SETTINGS` section at the top of the script in `index.html`. These two values are meant to be public. Never put the secret / service_role key in the file.
 3. In Supabase, set Authentication > URL Configuration > Site URL to your live link.
 
 Passwords are handled by Supabase Auth and are never stored by this project. The profile holds only what the sign-up form asks for. Collect only what you need, and tell users what is stored.
 
 When someone signs in, anything saved in that browser as a guest is merged into their account (the newer watch position wins), and from then on My List and Continue Watching are read from and written to the database.
+
+## Reviews and moderation
+
+Reviews are plain text written by signed-in users. The site escapes everything before showing it, so no code can be injected, but there is no profanity filter or report button. If you ever make the site public, add moderation (for example an admin who can delete reviews in the Supabase Table Editor).
 
 ## Free films
 

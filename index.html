@@ -116,7 +116,7 @@ body.nohero .filters{padding-top:92px}
 .auth{width:min(420px,94vw);padding:28px 26px;display:grid;gap:12px}
 .auth h2{font-size:1.5rem}.auth p{color:var(--mut);font-size:.92rem}
 .auth label{display:grid;gap:4px;font-size:.9rem}
-.auth input{padding:10px 12px;border-radius:8px;border:1px solid #8886;background:var(--bg)}
+.auth input,.auth select{padding:10px 12px;border-radius:8px;border:1px solid #8886;background:var(--bg);color:var(--fg)}
 .auth .b.s{color:var(--fg);background:#8883}
 #aerr{color:#ff8a8a;min-height:1.3em}
 .mo.gate{z-index:150;background:radial-gradient(circle at 25% 15%,#8a3ffc66,transparent 50%),radial-gradient(circle at 80% 85%,#ff3d4a55,transparent 50%),var(--bg)}
@@ -130,6 +130,22 @@ body.nohero .filters{padding-top:92px}
 .tabs button{flex:1;padding:8px;border-radius:8px;background:#8883;font-weight:700}
 .tabs button.on{background:linear-gradient(90deg,var(--acc),#ff7a3d);color:#fff}
 .cr{font-size:.8rem;border-left:3px solid var(--acc2);padding-left:10px}
+.sw{position:relative}
+.ar{position:absolute;top:0;bottom:34px;width:54px;z-index:8;color:var(--fg);font-size:2.4rem;opacity:0;transition:opacity .25s;display:grid;place-items:center}
+.ar.l{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.ar.r{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+.sw:hover .ar,.ar:focus-visible{opacity:1}
+@media(hover:none){.ar{display:none}}
+.inf h3{margin-top:8px}
+.ml{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:12px}
+.mi{text-align:left;border-radius:10px;transition:transform .2s}.mi:hover{transform:scale(1.05)}
+.mi .poster{display:flex;width:100%}.mi .poster b{font-size:.8rem;padding:8px}
+.rv{display:grid;gap:10px;border-top:1px solid #8884;padding-top:14px}
+.avg{font-size:1.15rem;font-weight:700;color:var(--fg)!important}.avg small{color:var(--mut);font-weight:400}
+.stars{display:flex;gap:4px}.st{font-size:1.9rem;line-height:1;color:#8886;transition:transform .15s}.st:hover{transform:scale(1.2)}.st.on{color:#ffd166}
+.rv textarea{font:inherit;width:100%;padding:10px 12px;border-radius:8px;border:1px solid #8886;background:var(--bg);color:var(--fg);min-height:72px;resize:vertical}
+.rvi{border-left:3px solid var(--acc2);padding-left:10px}.rvi p{margin-top:2px}.gold{color:#ffd166;letter-spacing:1px}
+#rve{color:#ff8a8a;min-height:1.2em}
 footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
 /* Mobile */
 @media(max-width:800px){
@@ -154,7 +170,7 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
   </div>
   <div class="rt">
     <div id="sbox"><input id="q" type="search" placeholder="Title, actor, genre…" aria-label="Search" autocomplete="off"><button id="clr" hidden aria-label="Clear search">×</button><button id="sbtn" aria-label="Search">🔍</button><div id="sug" hidden></div></div>
-    <button id="theme" aria-label="Toggle dark/light mode">🌓</button>
+    <button data-surprise aria-label="Surprise me with a random title">🎲</button><button id="theme" aria-label="Toggle dark/light mode">🌓</button>
     <button id="prof" aria-label="Profile menu" aria-haspopup="true"><span class="avatar">M</span></button>
     <div id="pm" hidden>
       <button data-act="profile">👤 Profile</button><button data-view="mylist">📌 My List</button><button data-view="continue">⏯ Continue Watching</button><button data-act="settings">⚙ Settings</button><button data-act="auth" id="authbtn">🔐 Sign in</button>
@@ -306,8 +322,32 @@ function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');cl
 // =====================  ROWS  =====================
 // [row title, function that picks titles]. Add or remove rows here.
 const g = n => a => a.filter(m => m.genre === n);
+// Finds the title you watched (or saved) most recently, so we can suggest similar ones
+function lastTouched() {
+  const w = Object.entries(cw).sort((x, y) => y[1].ts - x[1].ts)[0];
+  if (w && byId(w[0])) return {m:byId(w[0]), verb:'watched'};
+  const id = list[list.length - 1];
+  return id && byId(id) ? {m:byId(id), verb:'saved'} : null;
+}
+// Scores every title by how much it looks like title m (same genre, language, type, plus a little for rating)
+const similar = (m, a) => a.filter(x => x.id !== m.id)
+  .map(x => ({x, s:(x.genre === m.genre ? 2 : 0) + (x.language === m.language ? 1 : 0) + (x.type === m.type ? .5 : 0) + x.rating / 20}))
+  .filter(o => o.s >= 1).sort((p, q) => q.s - p.s).map(o => o.x);
+// "Picked For You": uses the favourite genres and preferred language saved in your profile
+function pickedFor(a) {
+  const p = profile || (user && user.user_metadata) || {};
+  const fg = p.favourite_genres || [], pl = p.preferred_language || '';
+  if (!user || (!fg.length && !pl)) return [];
+  return a.map(m => ({m, s:(fg.includes(m.genre) ? 3 : 0) + (pl && m.language === pl ? 2 : 0) + m.rating / 10}))
+    .filter(o => fg.includes(o.m.genre) || (pl && o.m.language === pl))
+    .sort((x, y) => y.s - x.s).slice(0, 12).map(o => o.m);
+}
+// A row title can be plain text or a function that builds the text (used for "Because you watched ...")
 const ROWS = [
  ['Trending Now', a => [...a].sort((x,y)=>y.rating-x.rating).slice(0,12)],
+ ['Picked For You', pickedFor],
+ [() => { const t = lastTouched(); return t ? 'Because you ' + t.verb + ' ' + t.m.title : 'Because you watched' },
+  a => { const t = lastTouched(); return t ? similar(t.m, a).slice(0, 12) : [] }],
  ['Free Classics & Open Films', a => a.filter(m=>m.real)],
  ['Top Rated 8.5+', a => a.filter(m=>m.rating>=8.5).sort((x,y)=>y.rating-x.rating)],
  ['Popular Movies', a => a.filter(m=>m.type==='movie').slice(0,12)],
@@ -315,7 +355,6 @@ const ROWS = [
  ['New Releases', a => a.filter(m=>m.year>=2026)],
  ['Continue Watching', a => a.filter(m=>cw[m.id])],
  ['My List', a => a.filter(m=>list.includes(m.id))],
- ['Recommended For You', a => a.filter(m=>m.id%2)],
  ['Action',g('Action')],['Comedy',g('Comedy')],['Drama',g('Drama')],['Thriller',g('Thriller')],
  ['Sci-Fi',g('Sci-Fi')],['Horror',g('Horror')],['Animation',g('Animation')],['Documentaries',g('Documentary')],
  ['Indian Cinema', a => a.filter(m=>INDIAN.includes(m.language))],
@@ -328,7 +367,7 @@ const card = m => {
   const p = cw[m.id], inList = list.includes(m.id);
   return `<article class="card" tabindex="0" data-id="${m.id}" aria-label="${esc(m.title)}">
   <div class="poster" style="--a:${m.c1};--b:${m.c2}">
-    ${m.poster ? `<img loading="lazy" src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">` : ''}
+    ${art(m)}
     <b>${esc(m.title)}</b>
     <div class="ov"><span>${m.language} · ${m.duration}</span><span>${esc(m.description).slice(0,60)}…</span>
       <div class="bt"><button data-play="${m.id}" aria-label="Play ${esc(m.title)}">▶</button><button data-list="${m.id}" aria-label="Add or remove ${esc(m.title)} from My List">${inList?'✓':'+'}</button></div></div>
@@ -336,14 +375,14 @@ const card = m => {
   </div>
   <div class="cap"><div>${esc(m.title)}</div><small>${m.year} · ${m.genre} · ★ ${m.rating}</small></div></article>`;
 };
-const row = (t, a) => `<section class="row" data-t="${t}"><h2>${t}</h2><div class="sc">${a.map(card).join('')}</div></section>`;
+const row = (t, a) => `<section class="row" data-t="${esc(t)}"><h2>${esc(t)}</h2><div class="sw"><button class="ar l" data-scroll="-1" aria-label="Scroll left">‹</button><div class="sc">${a.map(card).join('')}</div><button class="ar r" data-scroll="1" aria-label="Scroll right">›</button></div></section>`;
 const grid = (t, a) => `<h2 class="grid-h">${t}</h2><div class="grid">${a.map(card).join('')}</div>`;
 const empty = (t, s) => `<div class="empty"><div>🎬</div><h3>${t}</h3><p>${s}</p></div>`;
 
 // =====================  RENDER THE PAGE  =====================
 function render() {
   const {view, q} = state, scr = {};
-  document.querySelectorAll('.row').forEach(r => scr[r.dataset.t] = r.querySelector('.sc').scrollLeft); // keep scroll spots
+  document.querySelectorAll('.row').forEach(r => { const sc = r.querySelector('.sc'); if (sc) scr[r.dataset.t] = sc.scrollLeft });   // remember scroll spots (empty-message rows have no .sc)
   const pool = items.filter(m => (!F.genre||m.genre===F.genre) && (!F.language||m.language===F.language) && (!F.year||m.year==F.year) && (!F.rating||m.rating>=+F.rating));
   const filtered = F.genre||F.language||F.year||F.rating;
   let h = '';
@@ -361,13 +400,15 @@ function render() {
     h = r.length ? grid('New & Popular', r) : empty('Nothing matches', 'Try changing the filters.');
   } else {
     const base = view==='movies' ? pool.filter(m=>m.type==='movie') : view==='tv' ? pool.filter(m=>m.type==='show') : pool;
-    ROWS.forEach(([t, f]) => { const r = f(base);
+    const order = [...ROWS];
+    if (Object.keys(cw).length) { const i = order.findIndex(x => x[0] === 'Continue Watching'); order.unshift(order.splice(i, 1)[0]) }   // keep your unfinished titles on top
+    order.forEach(([t0, f]) => { const r = f(base), t = typeof t0 === 'function' ? t0() : t0;
       if (r.length) h += row(t, r);
       else if (view==='home' && !filtered && EMPTY[t]) h += `<section class="row"><h2>${t}</h2><p class="em">${EMPTY[t]}</p></section>`; });
     if (!h) h = empty('Nothing matches', 'Try changing the filters.');
   }
   $('#main').innerHTML = h;
-  document.querySelectorAll('.row').forEach(r => { if (scr[r.dataset.t]) r.querySelector('.sc').scrollLeft = scr[r.dataset.t] });
+  document.querySelectorAll('.row').forEach(r => { const sc = r.querySelector('.sc'); if (sc && scr[r.dataset.t]) sc.scrollLeft = scr[r.dataset.t] });
   document.querySelectorAll('.links button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
 }
 
@@ -376,7 +417,7 @@ let hi = 0, ht;
 function hero(i, fade) {
   hi = i;
   const draw = () => { const m = byId(FEATURED[hi]);
-    $('#hero').innerHTML = `<div class="slide" style="--a:${m.c1};--b:${m.c2}">${m.backdrop?`<img class="bg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()">`:''}<h1>${esc(m.title)}</h1>
+    $('#hero').innerHTML = `<div class="slide" style="--a:${m.c1};--b:${m.c2}"><img class="bg" src="${esc(m.backdrop || artUrl(m.id, true))}" alt="" onerror="this.onerror=null;this.src=artUrl(${m.id},true)"><h1>${esc(m.title)}</h1>
       <div class="meta"><span>${m.genre}</span><span>${m.year}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span></div>
       <p>${esc(m.description)}</p>
       <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-info="${m.id}">ⓘ More Info</button></div></div>
@@ -388,13 +429,15 @@ function hero(i, fade) {
 
 // =====================  MODAL (details)  =====================
 function openModal(id) {
-  const m = byId(id), inList = list.includes(m.id);
+  const m = byId(id), inList = list.includes(m.id), p = cw[m.id], more = similar(m, items).slice(0, 6);
   $('#modal').innerHTML = `<div class="md"><button class="x" id="mx" aria-label="Close">×</button>
-   <div class="bd" style="--a:${m.c1};--b:${m.c2}">${m.backdrop?`<img class="bdimg" src="${esc(m.backdrop)}" alt="" onerror="this.remove()">`:''}<div class="poster" style="--a:${m.c1};--b:${m.c2}">${m.poster?`<img src="${esc(m.poster)}" alt="${esc(m.title)} poster" onerror="this.remove()">`:''}</div><h2>${esc(m.title)}</h2></div>
+   <div class="bd" style="--a:${m.c1};--b:${m.c2}"><img class="bdimg" src="${esc(m.backdrop || artUrl(m.id, true))}" alt="" onerror="this.onerror=null;this.src=artUrl(${m.id},true)"><div class="poster" style="--a:${m.c1};--b:${m.c2}">${art(m)}</div><h2>${esc(m.title)}</h2></div>
    <div class="inf"><div class="meta"><span>${m.year}</span><span>${m.genre}</span><span>${m.duration}</span><span class="rt2">★ ${m.rating}</span><span>${m.language}</span><span>${m.type==='show'?'TV Show':'Movie'}</span>${m.real?'<span>Free to watch</span>':''}</div>
    <p>${esc(m.description)}</p><p><b>Cast:</b> ${esc(m.cast)}</p>${m.credit?`<p class="cr">${esc(m.credit)}</p>`:''}
-   <div class="btns"><button class="b p" data-play="${m.id}">▶ Play</button><button class="b s" data-list="${m.id}" style="color:var(--fg);background:#8883">${inList?'✓ In My List':'+ My List'}</button></div></div></div>`;
-  $('#modal').hidden = false; $('#mx').focus();
+   <div class="btns"><button class="b p" data-play="${m.id}">${p ? '▶ Resume at ' + fmt(p.t) : '▶ Play'}</button><button class="b s" data-list="${m.id}" style="color:var(--fg);background:#8883">${inList?'✓ In My List':'+ My List'}</button></div>
+   ${more.length ? `<h3>More like this</h3><div class="ml">${more.map(mini).join('')}</div>` : ''}
+   <div class="rv" id="rv" data-id="${m.id}"><p>Loading reviews…</p></div></div></div>`;
+  $('#modal').hidden = false; $('#mx').focus(); loadReviews(m.id);
 }
 $('#modal').addEventListener('click', e => { if (e.target.id==='modal' || e.target.id==='mx') $('#modal').hidden = true });
 
@@ -404,7 +447,7 @@ function toggleList(id) {
   i < 0 ? list.push(id) : list.splice(i, 1);
   saveList(id, i < 0); toast(i < 0 ? 'Added to My List' : 'Removed from My List');
   render();
-  if (!$('#modal').hidden) openModal(id);
+  document.querySelectorAll('#modal [data-list]').forEach(b => { if (+b.dataset.list === id) b.textContent = i < 0 ? '✓ In My List' : '+ My List' });
 }
 
 // =====================  VIDEO PLAYER  =====================
@@ -422,7 +465,12 @@ function closePlayer() {
   save(true); v.pause(); if (document.fullscreenElement) document.exitFullscreen();
   $('#player').hidden = true; v.removeAttribute('src'); v.load(); render();
 }
-function save(force) { if (cur && v.duration && v.currentTime > 1) { cw[cur.id] = {t:v.currentTime, d:v.duration, ts:Date.now()}; if (user) pushWatch(cur.id, force); else sv('cw_watch', cw) } }
+function save(force) {
+  if (!cur || !v.duration || v.currentTime <= 1) return;
+  if (v.currentTime >= v.duration - 5) { if (cw[cur.id]) { delete cw[cur.id]; dropWatch(cur.id) } return }   // finished: remove it from Continue Watching
+  cw[cur.id] = {t:v.currentTime, d:v.duration, ts:Date.now()};
+  if (user) pushWatch(cur.id, force); else sv('cw_watch', cw);
+}
 v.onerror = () => { if (!$('#player').hidden) $('#perr').hidden = false };
 v.ontimeupdate = () => { $('#seek').value = v.duration ? v.currentTime/v.duration*1000 : 0; $('#tm').textContent = fmt(v.currentTime)+' / '+fmt(v.duration);
   if (Date.now()-last > 2000) { save(); last = Date.now() } };
@@ -442,7 +490,8 @@ $('#pip').onclick = () => document.pictureInPictureElement ? document.exitPictur
 // Keyboard shortcuts: Space, ← →, M, F, Esc
 addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (!$('#player').hidden && !document.fullscreenElement) closePlayer(); else { $('#modal').hidden = true; $('#profm').hidden = true; if (!locked) $('#authm').hidden = true } return }
-  if ($('#player').hidden || e.target.matches('select,input')) return;
+  if (e.key === '/' && !locked && $('#player').hidden && !e.target.matches('input,textarea,select')) { e.preventDefault(); $('#sbox').classList.add('open'); $('#q').focus(); return }   // press / to search
+  if ($('#player').hidden || e.target.matches('select,input,textarea')) return;
   const k = e.key.toLowerCase();
   if (k === ' ') { e.preventDefault(); toggle() } else if (k === 'arrowleft') skip(-10);
   else if (k === 'arrowright') skip(10); else if (k === 'm') $('#mute').click(); else if (k === 'f') fs();
@@ -451,6 +500,10 @@ addEventListener('keydown', e => {
 // =====================  CLICKS (cards, buttons, hero)  =====================
 document.addEventListener('click', e => {
   const t = e.target, d = s => t.closest(s);
+  if (d('[data-scroll]')) { const b = d('[data-scroll]'), sc = b.parentElement.querySelector('.sc'); sc.scrollBy({left:+b.dataset.scroll * sc.clientWidth * .85, behavior:'smooth'}); return }
+  if (d('[data-star]')) return setStars(+d('[data-star]').dataset.star);
+  if (d('[data-st]')) return stAction(d('[data-st]'));
+  if (d('[data-surprise]')) { const pool = items.filter(m => !list.includes(m.id) && !cw[m.id]); const m = pool[Math.floor(Math.random() * pool.length)] || items[0]; return openModal(m.id) }
   if (d('[data-play]')) return play(d('[data-play]').dataset.play);
   if (d('[data-list]')) { e.stopPropagation(); return toggleList(d('[data-list]').dataset.list) }
   if (d('[data-info]')) return openModal(d('[data-info]').dataset.info);
@@ -461,7 +514,7 @@ document.addEventListener('click', e => {
   if (d('[data-act]')) { $('#pm').hidden = true; const act = d('[data-act]').dataset.act;
     if (act === 'profile') openProfile();
     else if (act === 'auth') { user ? sb.auth.signOut() : openAuth() }
-    else if (confirm('Reset My List and Continue Watching?')) resetData();
+    else if (act === 'settings') openSettings();
     return }
   if (d('[data-sug]')) { $('#q').value = d('[data-sug]').dataset.sug; doSearch(); return }
   if (!d('#pm') && !d('#prof')) $('#pm').hidden = true;
@@ -522,11 +575,15 @@ function dropWatch(id) {                             // called when a title is f
   if (!user) return sv('cw_watch', cw);
   lastKey = ''; cloud(sb.from('watch_progress').delete().eq('user_id', user.id).eq('title_id', id));
 }
-function resetData() {                               // Profile > Settings
-  list = []; cw = {};
-  if (user) { cloud(sb.from('my_list').delete().eq('user_id', user.id)); cloud(sb.from('watch_progress').delete().eq('user_id', user.id)) }
-  else { sv('cw_list', list); sv('cw_watch', cw) }
-  render(); toast('Saved data cleared');
+function clearList() {                               // Settings > Clear My List
+  list = [];
+  if (user) cloud(sb.from('my_list').delete().eq('user_id', user.id)); else sv('cw_list', list);
+  render(); toast('My List cleared');
+}
+function clearWatch() {                              // Settings > Clear Continue Watching
+  cw = {}; lastKey = '';
+  if (user) cloud(sb.from('watch_progress').delete().eq('user_id', user.id)); else sv('cw_watch', cw);
+  render(); toast('Continue Watching cleared');
 }
 
 // After signing in: move this browser's guest data into the account, then load everything from the database
@@ -556,7 +613,7 @@ async function onUser(u) {
   user = u; profile = null; updateAuthUI();
   if (u) {
     hideGate();
-    await Promise.all([loadProfile(), mergeAndLoad()]);
+    await Promise.all([loadProfile(), mergeAndLoad()]); render();
     const n = (profile && profile.full_name) || (u.user_metadata && u.user_metadata.full_name) || '';
     toast('Welcome' + (n ? ', ' + n.split(' ')[0] : ''));
   } else { list = ls('cw_list', []); cw = ls('cw_watch', {}); render(); showGate(); toast('Signed out') }
@@ -631,7 +688,7 @@ $('#profm').addEventListener('submit', async e => {
     favourite_genres:[...document.querySelectorAll('#pf input[name=pg]:checked')].map(c => c.value), updated_at:new Date().toISOString()};
   const r = await sb.from('profiles').upsert(row);
   if (r.error) { $('#perr2').textContent = 'Could not save: ' + r.error.message; return }
-  profile = row; updateAuthUI(); $('#profm').hidden = true; toast('Profile saved');
+  profile = row; updateAuthUI(); render(); $('#profm').hidden = true; toast('Profile saved');
 });
 
 // ----- Start the login wall -----
@@ -640,6 +697,116 @@ if (sb) {
   sb.auth.onAuthStateChange((event, session) => { setTimeout(() => onUser(session ? session.user : null), 0) });   // fires once at page load too
   sb.auth.getSession().then(r => { if (!r.data.session) showGate() }).catch(() => showGate());
 } else if (NEED_LOGIN) showGate('We could not load the sign-in service. Check your connection and refresh the page.');
+
+// =====================  ORIGINAL POSTER ART  =====================
+// Titles without their own picture get an artwork drawn in code (SVG), coloured by the title's two colours.
+// It is also the fallback when a photo cannot load (for example when you are offline).
+const rnd = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;     // tiny repeatable random number maker
+const dots = (m, n, h) => { const r = rnd(m.id * 97 + 13); let o = '';
+  for (let i = 0; i < n; i++) o += `<circle cx="${r()*400|0}" cy="${r()*h|0}" r="${(1+r()*2.2).toFixed(1)}" fill="#fff" fill-opacity="${(.35+r()*.55).toFixed(2)}"/>`; return o };
+const MOTIF = {                                       // one drawing style per genre (k = 0..4 moves things a little per title)
+ 'Sci-Fi': (m, k) => { const x = 140 + k * 30; return dots(m, 40, 360) + `<circle cx="${x}" cy="230" r="100" fill="#fff" fill-opacity=".18"/><circle cx="${x}" cy="230" r="64" fill="#fff" fill-opacity=".85"/><ellipse cx="${x}" cy="230" rx="150" ry="28" fill="none" stroke="#fff" stroke-width="7" stroke-opacity=".75" transform="rotate(-20 ${x} 230)"/>` },
+ 'Animation': (m, k) => dots(m, 18, 300) + `<circle cx="${250 + k * 15}" cy="190" r="85" fill="#ffd166" fill-opacity=".92"/><path d="M0 430 Q100 360 200 420 T400 400 V600 H0Z" fill="#000" fill-opacity=".25"/><path d="M0 500 Q120 440 230 490 T400 475 V600 H0Z" fill="#000" fill-opacity=".38"/>`,
+ 'Horror': (m, k) => `<circle cx="${230 + k * 18}" cy="180" r="90" fill="#fff" fill-opacity=".88"/><path d="M0 600 V480 L30 400 L48 480 L84 380 L104 480 L142 420 L172 490 L212 392 L244 490 L292 412 L322 490 L360 432 L400 505 V600Z" fill="#000" fill-opacity=".78"/>`,
+ 'Drama': (m, k) => `<circle cx="200" cy="${300 + k * 6}" r="115" fill="#fff" fill-opacity=".85"/><rect y="320" width="400" height="280" fill="#000" fill-opacity=".48"/><g stroke="#fff" stroke-opacity=".55" stroke-width="5" stroke-linecap="round"><path d="M110 352H290M135 380H265M162 408H238"/></g>`,
+ 'Action': (m, k) => `<path d="M-20 430 L300 ${70 + k * 8} L346 ${108 + k * 8} L20 478Z" fill="#fff" fill-opacity=".88"/><path d="M60 540 L400 190 L424 214 L96 568Z" fill="#fff" fill-opacity=".38"/>`,
+ 'Comedy': (m, k) => `<circle cx="200" cy="230" r="125" fill="#ffd166" fill-opacity=".95"/><circle cx="158" cy="200" r="15" fill="#000" fill-opacity=".75"/><circle cx="242" cy="200" r="15" fill="#000" fill-opacity=".75"/><path d="M130 262 Q200 ${330 + k * 6} 270 262" fill="none" stroke="#000" stroke-opacity=".75" stroke-width="11" stroke-linecap="round"/>`,
+ 'Thriller': (m, k) => { let o = ''; for (let i = 0; i < 9; i++) o += `<rect x="${i*46-6}" y="0" width="22" height="420" fill="#fff" fill-opacity="${i % 2 ? .1 : .2}" transform="skewX(-12)"/>`;
+   return o + `<circle cx="${160 + k * 20}" cy="300" r="46" fill="#000" fill-opacity=".7"/><rect x="${150 + k * 20}" y="330" width="20" height="90" rx="6" fill="#000" fill-opacity=".7"/>` },
+ 'Documentary': (m, k) => [40, 78, 118, 160].map((r, i) => `<circle cx="${200 + k * 8}" cy="230" r="${r}" fill="none" stroke="#fff" stroke-width="${i % 2 ? 4 : 8}" stroke-opacity="${(.85 - i * .17).toFixed(2)}"/>`).join('') + `<circle cx="${200 + k * 8}" cy="230" r="14" fill="#fff"/>`,
+ _: (m, k) => dots(m, 20, 300) + `<circle cx="${130 + k * 25}" cy="220" r="95" fill="#fff" fill-opacity=".22"/><circle cx="${240 + k * 10}" cy="260" r="75" fill="#fff" fill-opacity=".3"/>`
+};
+const artCache = {};
+function artUrl(id, wide) {                           // returns a picture address for title id (wide = banner shape)
+  const key = id + (wide ? 'w' : 'p'); if (artCache[key]) return artCache[key];
+  const m = byId(id), W = wide ? 1600 : 400, H = wide ? 900 : 600, k = m.id % 5;
+  const shape = (MOTIF[m.genre] || MOTIF._)(m, k), pic = wide ? `<g transform="translate(1000 40) scale(1.4)">${shape}</g>` : shape;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${m.c1}"/><stop offset="1" stop-color="${m.c2}"/></linearGradient><radialGradient id="r" cx=".7" cy=".25" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#g)"/><rect width="${W}" height="${H}" fill="url(#r)"/>${pic}</svg>`;
+  return artCache[key] = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+const art = m => `<img loading="lazy" src="${esc(m.poster || artUrl(m.id))}" alt="${esc(m.title)} poster" onerror="this.onerror=null;this.src=artUrl(${m.id})">`;
+const mini = m => `<button class="mi" data-info="${m.id}" aria-label="${esc(m.title)}"><span class="poster" style="--a:${m.c1};--b:${m.c2}">${art(m)}<b>${esc(m.title)}</b></span></button>`;
+
+// =====================  RATINGS AND REVIEWS (Supabase table "reviews")  =====================
+// Only your first name is shown next to a review. Everything typed by users is escaped with esc() before it is shown.
+async function loadReviews(id) {
+  const box = $('#rv'); if (!box) return;
+  if (!user) { box.innerHTML = '<p>Sign in to rate this title and read reviews.</p>'; return }
+  const r = await sb.from('reviews').select('user_id,stars,body,author_name,updated_at').eq('title_id', id).order('updated_at', {ascending:false}).limit(100);
+  if (r.error) { console.warn('reviews:', r.error.message); if ($('#rv') && $('#rv').dataset.id == id) $('#rv').innerHTML = '<p>Reviews are not available right now.</p>'; return }
+  drawReviews(id, r.data);
+}
+function drawReviews(id, rows) {
+  const box = $('#rv'); if (!box || box.dataset.id != id) return;            // you may have opened another title meanwhile
+  const mine = rows.find(r => r.user_id === user.id), n = rows.length, my = mine ? mine.stars : 0;
+  const avg = n ? (rows.reduce((t, r) => t + r.stars, 0) / n).toFixed(1) : null;
+  box.dataset.s = my;
+  box.innerHTML = `<h3>Ratings &amp; reviews</h3>
+   <p class="avg">${avg ? '★ ' + avg + ' <small>from ' + n + (n === 1 ? ' viewer' : ' viewers') + '</small>' : 'No reviews yet. Be the first!'}</p>
+   <form id="rvf" data-id="${id}"><div class="stars" role="group" aria-label="Your rating">${[1,2,3,4,5].map(k => `<button type="button" class="st${k <= my ? ' on' : ''}" data-star="${k}" aria-label="${k} star${k > 1 ? 's' : ''}">★</button>`).join('')}</div>
+    <textarea id="rvt" maxlength="500" aria-label="Your review" placeholder="What did you think? (optional, up to 500 characters)">${esc(mine && mine.body || '')}</textarea>
+    <p id="rve" role="alert"></p>
+    <div class="btns"><button class="b p" type="submit">${mine ? 'Update review' : 'Post review'}</button>${mine ? '<button class="b s" type="button" id="rvd" style="color:var(--fg);background:#8883">Delete</button>' : ''}</div></form>
+   ${rows.slice(0, 10).map(r => `<div class="rvi"><b>${esc(r.author_name)}</b> <span class="gold" aria-label="${r.stars} out of 5">${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)}</span>${r.user_id === user.id ? ' <small>(you)</small>' : ''}${r.body ? `<p>${esc(r.body)}</p>` : ''}</div>`).join('')}`;
+}
+function setStars(n) {                                // clicking a star in the review form
+  const b = $('#rv'); if (!b) return;
+  b.dataset.s = n; b.querySelectorAll('.st').forEach(x => x.classList.toggle('on', +x.dataset.star <= n));
+}
+$('#modal').addEventListener('submit', async e => {
+  if (e.target.id !== 'rvf') return; e.preventDefault();
+  const id = +e.target.dataset.id, stars = +$('#rv').dataset.s, err = $('#rve');
+  if (!stars) { err.textContent = 'Tap the stars to choose a rating first.'; return }
+  const first = (((profile && profile.full_name) || (user.user_metadata && user.user_metadata.full_name) || '').trim().split(/\s+/)[0] || 'A viewer').slice(0, 40);
+  err.textContent = 'Saving…';
+  const r = await sb.from('reviews').upsert({user_id:user.id, title_id:id, stars, body:$('#rvt').value.trim(), author_name:first, updated_at:new Date().toISOString()});
+  if (r.error) { console.warn('review:', r.error.message); if ($('#rve')) $('#rve').textContent = 'Could not save your review right now.'; return }
+  toast('Review saved'); loadReviews(id);
+});
+$('#modal').addEventListener('click', async e => {
+  if (e.target.id !== 'rvd' || !confirm('Delete your review?')) return;
+  const id = +$('#rv').dataset.id, r = await sb.from('reviews').delete().eq('user_id', user.id).eq('title_id', id);
+  if (r.error) { toast('Could not delete the review'); return }
+  toast('Review deleted'); loadReviews(id);
+});
+
+// =====================  SETTINGS (Profile menu > Settings)  =====================
+function openSettings() {
+  $('#profm').innerHTML = `<div class="md auth"><button type="button" class="x" id="pfx" aria-label="Close">×</button>
+   <h2>Settings</h2><p>${user ? 'Signed in as ' + esc(user.email) : 'You are using CineWave as a guest.'}</p>
+   <button class="b s" data-st="export">⬇ Download my data</button>
+   <button class="b s" data-st="list">Clear My List</button>
+   <button class="b s" data-st="watch">Clear Continue Watching</button>
+   ${user ? '<button class="b s" data-st="profile">Delete my profile details</button>' : ''}
+   <p class="cr">Passwords are handled by the sign-in service and are never stored by CineWave. To delete your account completely, ask the site owner.</p></div>`;
+  $('#profm').hidden = false;
+}
+function stAction(b) {                                // buttons in Settings; the clearing ones need a second click to confirm
+  const k = b.dataset.st;
+  if (k === 'export') return exportData();
+  if (b.dataset.arm !== '1') {
+    b.dataset.arm = '1'; b.dataset.label = b.textContent; b.textContent = 'Click again to confirm';
+    clearTimeout(b._t); b._t = setTimeout(() => { b.dataset.arm = ''; b.textContent = b.dataset.label }, 4000); return;
+  }
+  clearTimeout(b._t); b.dataset.arm = ''; b.textContent = b.dataset.label;
+  if (k === 'list') clearList(); else if (k === 'watch') clearWatch(); else if (k === 'profile') deleteProfile();
+}
+async function deleteProfile() {
+  const a = await sb.from('profiles').delete().eq('id', user.id);
+  const c = await sb.auth.updateUser({data:{full_name:null, date_of_birth:null, country:null, preferred_language:null, favourite_genres:null}});   // the sign-up copy kept in the account
+  if (a.error || c.error) { toast('Could not delete everything. Try again later.'); console.warn(a.error || c.error); return }
+  if (c.data && c.data.user) user = c.data.user;
+  profile = null; updateAuthUI(); render(); toast('Profile details deleted');
+}
+async function exportData() {                         // saves a JSON file with everything CineWave keeps about you
+  const out = {exported_at:new Date().toISOString(), account:user ? {email:user.email} : 'guest', profile:profile || null,
+    my_list:list.map(id => ({id, title:(byId(id) || {}).title})),
+    continue_watching:Object.entries(cw).map(([id, p]) => ({id:+id, title:(byId(id) || {}).title, position_seconds:Math.round(p.t), duration_seconds:Math.round(p.d), last_watched:new Date(p.ts).toISOString()}))};
+  if (user) { const r = await sb.from('reviews').select('title_id,stars,body,updated_at').eq('user_id', user.id); if (!r.error) out.reviews = r.data }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], {type:'application/json'})); a.download = 'my-cinewave-data.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Data downloaded');
+}
 
 // =====================  START  =====================
 setTimeout(() => { hero(0); render() }, 700);   // short delay so the loading skeletons are visible

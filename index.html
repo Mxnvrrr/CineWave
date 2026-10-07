@@ -130,6 +130,13 @@ body.nohero .filters{padding-top:92px}
 .tabs button{flex:1;padding:8px;border-radius:8px;background:#8883;font-weight:700}
 .tabs button.on{background:linear-gradient(90deg,var(--acc),#ff7a3d);color:#fff}
 .cr{font-size:.8rem;border-left:3px solid var(--acc2);padding-left:10px}
+.auth{grid-template-columns:minmax(0,1fr)}          /* lets the Top 10 strip scroll sideways instead of stretching the box */
+#t10g{border-top:1px solid #8884;padding-top:12px;min-width:0}#t10g h3{font-size:1rem;margin-bottom:8px}
+.t10{display:flex;gap:10px;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x proximity}
+.t10i{flex:0 0 92px;scroll-snap-align:start;position:relative}
+.t10i .poster{width:100%}.t10i .poster b{font-size:.75rem;padding:6px}
+.t10i small{display:block;color:var(--mut);font-size:.7rem;margin-top:4px;line-height:1.25}
+.t10i .rk{position:absolute;top:4px;left:4px;z-index:2;background:var(--acc);color:#fff;font-weight:800;font-size:.7rem;border-radius:6px;padding:1px 6px}
 .sw{position:relative}
 .ar{position:absolute;top:0;bottom:34px;width:54px;z-index:8;color:var(--fg);font-size:2.4rem;opacity:0;transition:opacity .25s;display:grid;place-items:center}
 .ar.l{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
@@ -224,6 +231,8 @@ footer{text-align:center;color:var(--mut);padding:30px 4% 50px;font-size:.85rem}
     <label>Password (6+ characters)<input id="pw" type="password" required minlength="6" autocomplete="current-password"></label>
     <p id="aerr" role="alert"></p>
     <button class="b p" type="submit" id="abtn">Sign in</button>
+    <!-- Community Top 10: read-only, the only part of the site a logged-out visitor can see. Filled in by drawTop10Gate(). -->
+    <section id="t10g" hidden aria-label="Community Top 10"></section>
   </form>
 </div>
 <!-- Profile box (Profile menu > Profile) -->
@@ -342,9 +351,16 @@ function pickedFor(a) {
     .filter(o => fg.includes(o.m.genre) || (pl && o.m.language === pl))
     .sort((x, y) => y.s - x.s).slice(0, 12).map(o => o.m);
 }
+// Community Top 10: the ranking itself is worked out in the database (function community_top10, see supabase-top10.sql).
+// top10 is a list of {id, avg, n} in rank order, or null until it has been loaded. loadTop10() fills it.
+let top10 = null, top10At = 0;
+function communityPick(a) {                          // keep rank order, drop titles hidden by the filters, remember each title's rank/average/count
+  return (top10 || []).map((x, i) => { const m = a.find(t => t.id === x.id); return m && {...m, cr:{rank:i + 1, avg:x.avg, n:x.n}} }).filter(Boolean);
+}
 // A row title can be plain text or a function that builds the text (used for "Because you watched ...")
 const ROWS = [
  ['Trending Now', a => [...a].sort((x,y)=>y.rating-x.rating).slice(0,12)],
+ ['Community Top 10', communityPick],
  ['Picked For You', pickedFor],
  [() => { const t = lastTouched(); return t ? 'Because you ' + t.verb + ' ' + t.m.title : 'Because you watched' },
   a => { const t = lastTouched(); return t ? similar(t.m, a).slice(0, 12) : [] }],
@@ -373,7 +389,7 @@ const card = m => {
       <div class="bt"><button data-play="${m.id}" aria-label="Play ${esc(m.title)}">▶</button><button data-list="${m.id}" aria-label="Add or remove ${esc(m.title)} from My List">${inList?'✓':'+'}</button></div></div>
     ${p ? `<i class="pb"><u style="width:${Math.min(100,p.t/p.d*100)}%"></u></i>` : ''}
   </div>
-  <div class="cap"><div>${esc(m.title)}</div><small>${m.year} · ${m.genre} · ★ ${m.rating}</small></div></article>`;
+  <div class="cap"><div>${esc(m.title)}</div><small>${m.cr ? `#${m.cr.rank} · ★ ${m.cr.avg.toFixed(1)} · ${m.cr.n} reviews` : `${m.year} · ${m.genre} · ★ ${m.rating}`}</small></div></article>`;
 };
 const row = (t, a) => `<section class="row" data-t="${esc(t)}"><h2>${esc(t)}</h2><div class="sw"><button class="ar l" data-scroll="-1" aria-label="Scroll left">‹</button><div class="sc">${a.map(card).join('')}</div><button class="ar r" data-scroll="1" aria-label="Scroll right">›</button></div></section>`;
 const grid = (t, a) => `<h2 class="grid-h">${t}</h2><div class="grid">${a.map(card).join('')}</div>`;
@@ -613,7 +629,7 @@ async function onUser(u) {
   user = u; profile = null; updateAuthUI();
   if (u) {
     hideGate();
-    await Promise.all([loadProfile(), mergeAndLoad()]); render();
+    await Promise.all([loadProfile(), mergeAndLoad(), loadTop10(true)]); render();
     const n = (profile && profile.full_name) || (u.user_metadata && u.user_metadata.full_name) || '';
     toast('Welcome' + (n ? ', ' + n.split(' ')[0] : ''));
   } else { list = ls('cw_list', []); cw = ls('cw_watch', {}); render(); showGate(); toast('Signed out') }
@@ -761,14 +777,34 @@ $('#modal').addEventListener('submit', async e => {
   err.textContent = 'Saving…';
   const r = await sb.from('reviews').upsert({user_id:user.id, title_id:id, stars, body:$('#rvt').value.trim(), author_name:first, updated_at:new Date().toISOString()});
   if (r.error) { console.warn('review:', r.error.message); if ($('#rve')) $('#rve').textContent = 'Could not save your review right now.'; return }
-  toast('Review saved'); loadReviews(id);
+  toast('Review saved'); loadReviews(id); loadTop10(true);
 });
 $('#modal').addEventListener('click', async e => {
   if (e.target.id !== 'rvd' || !confirm('Delete your review?')) return;
   const id = +$('#rv').dataset.id, r = await sb.from('reviews').delete().eq('user_id', user.id).eq('title_id', id);
   if (r.error) { toast('Could not delete the review'); return }
-  toast('Review deleted'); loadReviews(id);
+  toast('Review deleted'); loadReviews(id); loadTop10(true);
 });
+
+// =====================  COMMUNITY TOP 10 (database function community_top10)  =====================
+// Works for logged-out visitors too: the function runs inside the database and returns only title, average and count.
+async function loadTop10(force) {
+  if (!sb || (!force && top10 && Date.now() - top10At < 60000)) return;      // reuse the last answer for a minute
+  try {
+    const r = await sb.rpc('community_top10'); if (r.error) throw r.error;
+    top10 = (Array.isArray(r.data) ? r.data : []).map(x => ({id:+x.title_id, avg:+x.avg_stars, n:+x.review_count}))
+      .filter(x => byId(x.id) && isFinite(x.avg) && isFinite(x.n));          // ignore anything that is not one of our titles
+    top10At = Date.now();
+  } catch (e) { console.warn('community_top10:', e.message || e); top10 = top10 || [] }   // on an error the row and strip simply stay hidden
+  drawTop10Gate(); if (user) render();                   // the login strip is already drawn; the row only exists after sign-in
+}
+function drawTop10Gate() {                            // the read-only strip on the login screen
+  const box = $('#t10g'), t = top10 || []; if (!box) return;
+  box.hidden = !t.length;
+  box.innerHTML = t.length ? `<h3>Community Top 10</h3><div class="t10" role="list">${t.map((x, i) => { const m = byId(x.id);
+    return `<div class="t10i" role="listitem" aria-label="${esc(m.title)}, rank ${i + 1}, ${x.avg.toFixed(1)} stars from ${x.n} reviews"><span class="rk">#${i + 1}</span>
+      <span class="poster" style="--a:${m.c1};--b:${m.c2}">${art(m)}<b>${esc(m.title)}</b></span><small>★ ${x.avg.toFixed(1)} · ${x.n} reviews</small></div>` }).join('')}</div>` : '';
+}
 
 // =====================  SETTINGS (Profile menu > Settings)  =====================
 function openSettings() {
@@ -810,6 +846,7 @@ async function exportData() {                         // saves a JSON file with 
 
 // =====================  START  =====================
 setTimeout(() => { hero(0); render() }, 700);   // short delay so the loading skeletons are visible
+loadTop10();                                      // Community Top 10 works before anyone signs in (the function is open to logged-out visitors)
 </script>
 </body>
 </html>

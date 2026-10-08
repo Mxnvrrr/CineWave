@@ -65,9 +65,18 @@ Passwords are handled by Supabase Auth and are never stored by this project. The
 
 When someone signs in, anything saved in that browser as a guest is merged into their account (the newer watch position wins), and from then on My List and Continue Watching are read from and written to the database.
 
-## Reviews and moderation
+## Review rules
 
-Reviews are plain text written by signed-in users. The site escapes everything before showing it, so no code can be injected, but there is no profanity filter or report button. If you ever make the site public, add moderation (for example an admin who can delete reviews in the Supabase Table Editor).
+These rules are enforced by the database (Row Level Security and table checks in `supabase-extras.sql`), not just by the page:
+
+- Only signed-in users can read, write or delete reviews. People who are not signed in cannot read the `reviews` table at all.
+- One review per person per title (the primary key is `user_id` + `title_id`). Posting again updates your review.
+- A review is 1 to 5 stars plus optional text of up to 500 characters. Only your first name is shown next to it.
+- You can only add, change or delete your **own** reviews.
+- The page escapes all review text before showing it, so no code can be injected.
+- The Community Top 10 counts a title only when it has **at least 2 reviews**. Visitors who are not signed in see only the title, the average and the review count, never names or review text (see "Community Top 10" below).
+
+**Known limits, not built yet (listed for a later task):** there is no profanity filter, no report button and no limit on how many reviews one account can post per hour. Fake accounts can still push a title up the Top 10, because the 2-review minimum only slows that down. If the site ever becomes public, add moderation (for example an admin who can delete reviews in the Supabase Table Editor), a report button, a posting limit, and a higher minimum or "verified viewer" rule for the Top 10.
 
 ## Community Top 10
 
